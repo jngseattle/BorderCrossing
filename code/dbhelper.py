@@ -68,7 +68,9 @@ def get_crossings():
 
     data = []
     with PgDB() as db:
-        return pd.read_sql(query, con=db.conn)
+        df = pd.read_sql(query, con=db.conn)
+
+    return df.set_index('id')
     #     db.cur.execute(query)
     #     for row in db.cur:
     #         data.append({'id': row[0],
