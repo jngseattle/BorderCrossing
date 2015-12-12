@@ -13,56 +13,42 @@ app.config.from_object('config')
 def index():
     form = BorderForm()
     if form.validate_on_submit():
-        flash('Date="%s", location=%s' %
-              (form.date.data, str(form.location.data)))
-        g.date = form.date.data
-        g.location = form.location.data
-        return redirect('/predict')
+        # flash('Date="%s", location=%s' %
+        #       (form.date.data, str(form.location.data)))
+
+        url = '/predict/{0}/{1}'.format(form.date.data, form.location.data)
+        # return redirect('/predict')
+        return redirect(url)
 
     return render_template('index.html',
                            form=form)
 
 
 # chart page
-@app.route('/predict')
-def prediction_page():
+@app.route('/predict/<date>/<location>')
+@app.route('/predict/<date>/<location>/<direction>')
+@app.route('/predict/<date>/<location>/<direction>/<lane>')
+def prediction_page(date, location, direction='Southbound', lane='Cars'):
+    results = daily_prediction(date, location, direction, lane)
 
-    date = g.date
-    location = g.location
-
-    # v1 will have a single direction and lane
-    direction = 'Southbound'
-    lane = 'Cars'
-
-    delays = daily_prediction(date, location, direction, lane)
+    # labels/values will be pulled from results
+    labels = ["January","February","March","April","May","June","July","August"]
+    values = [10,9,8,7,6,4,7,8]
 
     return render_template('chart.html',
                             date=date,
                             location=location,
                             direction=direction,
                             lane=lane,
-                            delays=delays)
-
-
-# chart test
-def create_linechart():
-    x = range(1, 10)
-    y = range(1, 10)
-
-    hover = HoverTool(tooltips=[("(x, y)", "($x, $y)")])
-
-    p = figure(plot_width=800, plot_height=400, tools=[hover])
-
-    p.line(x, y)
-
-    return p
+                            values=values,
+                            labels=labels)
 
 
 @app.route('/chart')
-def test_chart():
-    chart = create_linechart()
-    script, div = embed.components(chart)
-    return render_template('chart.html', script=script, div=div)
+def chart():
+    labels = ["January","February","March","April","May","June","July","August"]
+    values = [10,9,8,7,6,4,7,8]
+    return render_template('chart.html', values=values, labels=labels)
 
 
 if __name__ == '__main__':
