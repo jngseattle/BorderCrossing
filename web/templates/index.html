@@ -23,11 +23,13 @@
 
         <div class="form-group">
             <label class="col-lg-2 control-label">Date</label>
-            <div class="col-lg-10">
-                <input type="text" value="02/09/2016" name="date" id="dp1" >
+            <div class="col-lg-2" id="date-container">
+                <div class="input-group date">
+                  <input name="date" type="text" class="form-control"><span class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
+                </div>
                 {% for error in form.date.errors %}
                   <span style="color: red;">[{{ error }}]</span>
-                {% endfor %}<br>
+                {% endfor %}
             </div>
         </div>
 
