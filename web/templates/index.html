@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+
+    <div class="table-responsive">
+        <table class="table">
+            <tr>
+                <td><img src="static/image/seattle.jpg" width="100%"/></td>
+                <td><img src="static/image/vancouver.jpg" width="100%"/></td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="container">
+        <div class="jumbotron">
+          <h1>Predict Border Wait Times</h1>
+          <p>Find out how long it will take to cross the US/Canada border.</p>
+        </div>
+    </div>
+
+    <div class="container">
+    <form class="form-horizontal" action='/' method='POST'>
+        {{ form.hidden_tag() }}
+      <fieldset>
+
+        <div class="form-group">
+            <label class="col-lg-2 control-label">Date</label>
+            <div class="col-lg-10">
+                <input type="text" value="02/09/2016" name="date" id="dp1" >
+                {% for error in form.date.errors %}
+                  <span style="color: red;">[{{ error }}]</span>
+                {% endfor %}<br>
+            </div>
+        </div>
+
+        <div class="form-group">
+          <label class="col-lg-2 control-label">Location</label>
+          <div class="col-lg-10">
+            <div class="radio">
+              <label>
+                <input type="radio" name="location" value="Peace Arch" checked="">
+                Peace Arch
+              </label>
+            </div>
+            <div class="radio">
+              <label>
+                <input type="radio" name="location" value="Pacific Highway">
+                Pacific Highway
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <div class="col-lg-10 col-lg-offset-2">
+            <button type="reset" class="btn btn-default">Cancel</button>
+            <button type="submit" class="btn btn-primary">Predict</button>
+          </div>
+        </div>
+      </fieldset>
+    </form>
+    </div>
+{% endblock %}
