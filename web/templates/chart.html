@@ -1,51 +1,127 @@
 {% extends "base.html" %}
+{% block header %}
+    <link rel="stylesheet" href="//cdn.jsdelivr.net/chartist.js/latest/chartist.min.css">
+    <link href="/static/css/custom.css" rel="stylesheet">
+{% endblock %}
 {% block content %}
-<link href="/static/css/custom.css" rel="stylesheet">
-<div class="container">
     <div class="panel panel-default">
       <div class="panel-heading">
         <h3 class="panel-title">
-            <div align="right">
-                <span class="label label-warning">{{date}}</span>
-                <span class="label label-primary">{{location}}</span>
-                <span class="label label-success">{{direction}}</span>
-                <span class="label label-info">{{lane}}</span>
+            <div class="row">
+                <div class="col-lg-10"><h3>Predicted Delay</h3></div>
+                <div class="col-lg-2">
+                    <div class="input-group date">
+                      <input type="text" class="form-control" value="{{default_date}}">
+                      <span class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
+                    </div>
+                </div>
             </div>
-            <div><h3>Average Delay (minutes)</h3></div>
         </h3>
       </div>
-      <div class="panel-body" align="center">
-          <canvas id="chart"></canvas>
-      </div>
     </div>
-</div>
+    <div class="panel-body">
+        <div class="col-lg-8">
+            <div class="ct-chart ct-octave"></div>
+        </div>
+        <div class="col-lg-1"></div>
+        <div class="col-lg-2">
+            <div class="row top30"></div>
+            <div class="row">
+                <div class="btn-group btn-block">
+                  <button type="button" class="btn btn-primary dropdown-toggle btn-block" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    {{location}} <span class="caret"></span>
+                  </button>
+                  <ul class="dropdown-menu">
+                    <li><a href="/predict/{{date}}/Peace%20Arch">Peace Arch</a></li>
+                    <li><a href="/predict/{{date}}/Pacific%20Highway">Pacific Highway</a></li>
+                  </ul>
+                </div>
+            </div>
+            <div class="row top10"></div>
+            <div class="row"><button type="button" class="btn btn-success btn-block" disabled="disabled">{{direction}}</button></div>
+            <div class="row top10"></div>
+            <div class="row"><button type="button" class="btn btn-info btn-block" disabled="disabled">{{lane}}</button></div>
+        </div>
+        <div class="col-lg-1"></div>
+    </div>
+{% endblock %}
 
-<script src="/static/js/Chart.min.js"></script>
+{% block script %}
+<script src="//cdn.jsdelivr.net/chartist.js/latest/chartist.min.js"></script>
+<script src="/static/js/chartist-plugin-axistitle.min.js"></script>
 <script>
-    Chart.defaults.global.responsive = true;
+$('.input-group.date').datepicker()
+    .on('changeDate', function(e) {
+        var parts = e.date.toLocaleDateString("en-US").split("/");
+
+        var link = "";
+        link = link.concat('/predict/', parts[2], '-', parts[0], '-', parts[1], '/', encodeURIComponent('{{location}}'));
+        location.href = link;
+    });
 </script>
 <script>
-   var lineData = {
-   labels : [{% for item in labels %}
-                  "{{item}}",
-              {% endfor %}],
-   datasets : [
-      {
-            fillColor: "rgba(151,187,205,0.2)",
-            strokeColor: "rgba(151,187,205,1)",
-            pointColor: "rgba(151,187,205,1)",
-         data : [{% for item in values %}
-                      {{item}},
-                    {% endfor %}]
+var data = {
+    labels : [{% for item in labels %}"{{item}}",{% endfor %}],
+    series : [[{% for item in values %}{{item}},{% endfor %}]]
+};
+
+var options = {
+    showPoint: false,
+    lineSmooth: Chartist.Interpolation.cardinal({
+        fillHoles: true,
+    }),
+    low: 0,
+    chartPadding: {
+                    top: 0,
+                    right: 0,
+                    bottom: 40,
+                    left: 40
+                },
+    plugins: [
+    Chartist.plugins.ctAxisTitle({
+      axisX: {
+        axisTitle: 'Time of day',
+        axisClass: 'ct-axis-title',
+        offset: {
+          x: 0,
+          y: 40
+        },
+        textAnchor: 'middle'
+      },
+      axisY: {
+        axisTitle: 'Average Delay (minutes)',
+        axisClass: 'ct-axis-title',
+        offset: {
+          x: 0,
+          y: 40
+        },
+        textAnchor: 'middle',
+        flipTitle: true
       }
-      ]
-   }
+    })
+  ]
+};
 
-   // get chart canvas
-   var ctx = document.getElementById("chart").getContext("2d");
+chart = new Chartist.Line('.ct-chart', data, options);
 
-   // draw line chart
-   new Chart(ctx).Line(lineData);
-
+// Animation of line
+chart.on('draw', function(data) {
+  if(data.type === 'line') {
+    data.element.animate({
+      opacity: {
+        dur: 500,
+        from: 0,
+        to: 1
+      },
+      d: {
+        begin: 1000 * data.index,
+        dur: 1000,
+        from: data.path.clone().scale(1, 0).translate(0, data.chartRect.height()).stringify(),
+        to: data.path.clone().stringify(),
+        easing: Chartist.Svg.Easing.easeOutQuint
+      }
+    });
+  }
+});
 </script>
 {% endblock %}
