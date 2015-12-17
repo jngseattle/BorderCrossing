@@ -67,10 +67,11 @@ var data = {
 
 var options = {
     showPoint: false,
-    lineSmooth: Chartist.Interpolation.cardinal({
-        fillHoles: true,
-    }),
     low: 0,
+    lineSmooth: Chartist.Interpolation.cardinal({
+        tension: 0,
+        fillHoles: true
+    }),
     chartPadding: {
                     top: 0,
                     right: 0,
@@ -84,7 +85,7 @@ var options = {
         axisClass: 'ct-axis-title',
         offset: {
           x: 0,
-          y: 40
+          y: 50
         },
         textAnchor: 'middle'
       },
@@ -93,7 +94,7 @@ var options = {
         axisClass: 'ct-axis-title',
         offset: {
           x: 0,
-          y: 40
+          y: 20
         },
         textAnchor: 'middle',
         flipTitle: true

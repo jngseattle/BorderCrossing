@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import datetime
 import pdb
-
+from sklearn.metrics import r2_score, mean_squared_error, explained_variance_score
 
 class BorderData(object):
     '''
@@ -11,12 +11,15 @@ class BorderData(object):
             X: feature dataframe
             y: label series
             label: name of label
+            cv: all cross validation folds
             cv_train: cross validation folds for training set
             test_indices: indices of test set
             X_train: feature dataframe for training set
             X_test: feature dataframe for test set
             y_train: label series for training set
             y_test: label series for test set
+            baseline: series for last years data averaged by day of week
+            yhat: series of predicted values
     '''
     def __init__(self, df, years=3, label='waittime'):
         '''
@@ -45,6 +48,8 @@ class BorderData(object):
         self.cv_train = self.cv[:-1]
         self.test_indices = self.cv[-1][1]
         self.prepare_train_test()
+        self.baseline = self.baseline_model()['baseline']
+
 
     def prepare_train_test(self):
         '''
@@ -69,20 +74,25 @@ class BorderData(object):
 
         df.columns = ['baseline']
 
-        return self.df_last().reset_index() \
-                   .merge(df.reset_index(), on=['dayofweek', 'minofday']) \
-                   .set_index('date')
+        df = self.df_last().reset_index() \
+                 .merge(df.reset_index(), how='left',
+                        on=['dayofweek', 'minofday']).set_index('date') \
+                 .sort_index()
 
-    def prediction(self, model):
+        return df
+
+    def predict(self, model):
         '''
         IN
-            model: trained model which used data from this object
+            model: trained sklearn model which used data from this object
         OUT
             Dataframe of test set with predictions for plotting
         '''
         df = self.df_last()
 
         df['prediction'] = model.predict(self.X_test)
+
+        self.yhat = df['prediction']
         return df
 
     def df_last(self):
@@ -119,14 +129,53 @@ class BorderData(object):
 
         return np.array(cv)
 
-    def plot(self, model, start, end):
-        predict = self.prediction(model)
-        baseline = self.baseline_model()
+    def plot(self, start, end):
+        '''
+        Plot waittime, baseline and prediction
+        Assumes model has been fit
+        '''
+        df = self.df_last()
+        df['baseline'] = self.baseline
 
-        df = baseline.join(predict[['prediction']])
+        if self.yhat is None:
+            raise RuntimeError('yhat is null.  Run predict method first.')
+
+        df['prediction'] = self.yhat
         df = df.loc[(df.index > start) & (df.index <= end)]
         df[['waittime', 'baseline', 'prediction']].plot(figsize=(14, 6),
-                                                        alpha=.5)
+                                                        alpha=.7)
+
+    def print_metrics(self, model):
+        '''
+        Print comparison metrics between baseline and model
+        IN
+            model: trained sklearn model object
+        '''
+        # Built-in model metrics
+        if hasattr(model, 'oob_score_'):
+            print "OOB: ", model.oob_score_
+        if hasattr(model, 'best_score_'):
+            print "Best score: ", model.best_score_
+
+        # MSE
+        df = self.df_last()
+        print "** MSE for last cv fold **"
+        print "Baseline : ", mean_squared_error(df.waittime.values,
+                                                self.baseline.values)
+        print "Model    : ", mean_squared_error(df.waittime.values,
+                                                self.yhat.values)
+
+        # R^2
+        print "** R^2 for last cv fold **"
+        print "Baseline : ", r2_score(df.waittime.values, self.baseline.values)
+        print 'Model    : ', r2_score(df.waittime.values, self.yhat.values)
+
+        # Explained Variance
+        print "** Explained variance for last cv fold **"
+        print "Baseline : ", explained_variance_score(df.waittime.values,
+                                                      self.baseline.values)
+        print 'Model    : ', explained_variance_score(df.waittime.values,
+                                                      self.yhat.values)
 
 
 def clean_df_subset(df, subset, label='waittime'):
