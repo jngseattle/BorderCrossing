@@ -5,7 +5,7 @@ import datetime
 import pandas as pd
 
 
-def pd_query(query, vals, result=None, i=None):
+def pd_query(query, vals=(), result=None, i=None):
     '''
     Simple routine to query with dataframe result (supports threads)
     For threading, call with:
@@ -22,6 +22,7 @@ def pd_query(query, vals, result=None, i=None):
             result[i] = res
 
     return res
+
 
 def get_directions():
     dirs = {}
@@ -71,16 +72,6 @@ def get_crossings():
         df = pd.read_sql(query, con=db.conn)
 
     return df.set_index('id')
-    #     db.cur.execute(query)
-    #     for row in db.cur:
-    #         data.append({'id': row[0],
-    #                      'location_id': row[1],
-    #                      'lane_id': row[2],
-    #                      'direction_id': row[3],
-    #                      'location_name': row[4],
-    #                      'lane_name': row[5],
-    #                      'direction_name': row[6]})
-    # return data
 
 
 def get_crossing_id(location_id, lane_name, dir_name):
