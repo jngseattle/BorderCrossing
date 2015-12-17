@@ -1,16 +1,16 @@
 import unittest
 from BorderModel import BorderData, clean_df_subset
-from modelhelper import cvfolds
 from dbhelper import pd_query
 import copy
 from random import randint
+
 
 class TestBorderData(unittest.TestCase):
     def test_normal(self):
         '''
         Normal use case - use raw data from query
         '''
-        data = BorderData(df, cv)
+        data = BorderData(df)
 
         # Test features
         self.assertEqual(len(features), len(data.X.columns.values))
@@ -27,7 +27,7 @@ class TestBorderData(unittest.TestCase):
         '''
         subset = ['dayofweek', 'minofday']
         dfnew = clean_df_subset(df, subset)
-        data = BorderData(dfnew, cv)
+        data = BorderData(dfnew)
 
         # Test features
         self.assertEqual(len(subset), len(data.X.columns.values))
@@ -45,7 +45,7 @@ class TestBorderData(unittest.TestCase):
         '''
         dfnew = df.copy()
         dfnew['ym'] = df.year * df.month
-        data = BorderData(dfnew, cv)
+        data = BorderData(dfnew)
 
         # Test features
         superset = copy.copy(features)
@@ -65,7 +65,7 @@ class TestBorderData(unittest.TestCase):
         '''
         dfnew = df.copy()
         dfnew['wt2'] = df.waittime * 2
-        data = BorderData(dfnew, cv, label='wt2')
+        data = BorderData(dfnew, label='wt2')
 
         # Test features
         self.assertEqual(len(features), len(data.X.columns.values))
@@ -84,7 +84,7 @@ class TestBorderData(unittest.TestCase):
         dfnew['wt2'] = df.waittime * 2
         subset = ['dayofweek', 'minofday']
         dfnew = clean_df_subset(dfnew, subset, label='wt2')
-        data = BorderData(dfnew, cv, label='wt2')
+        data = BorderData(dfnew, label='wt2')
 
         # Test features
         self.assertEqual(len(subset), len(data.X.columns.values))
@@ -96,18 +96,27 @@ class TestBorderData(unittest.TestCase):
             self.assertEqual(dfnew['wt2'].values[i], data.y.values[i])
 
     def test_cvfolds(self):
-        data = BorderData(df, cv)
-        cvx = data.cvfolds(3)
+        data = BorderData(df, 2)
 
-        self.assertEqual(max(cvx[-1, -2]),
+        self.assertEqual(max(data.cv[-1, -2]),
                          data.df[data.df.year == 2014].index.max())
-        self.assertEqual(min(cvx[-1, -1]),
+        self.assertEqual(min(data.cv[-1, -1]),
                          data.df[data.df.year == 2015].index.min())
-        self.assertEqual(max(cvx[-1, -1]),
+        self.assertEqual(max(data.cv[-1, -1]),
                          data.df[data.df.year == 2015].index.max())
-        self.assertEqual(len(cvx[-1, -1]),
+        self.assertEqual(len(data.cv[-1, -1]),
                          data.df[data.df.year == 2015].waittime.count())
 
+        data = BorderData(df, 3)
+
+        self.assertEqual(max(data.cv[-1, -2]),
+                         data.df[data.df.year == 2014].index.max())
+        self.assertEqual(min(data.cv[-1, -1]),
+                         data.df[data.df.year == 2015].index.min())
+        self.assertEqual(max(data.cv[-1, -1]),
+                         data.df[data.df.year == 2015].index.max())
+        self.assertEqual(len(data.cv[-1, -1]),
+                         data.df[data.df.year == 2015].waittime.count())
 
 if __name__ == '__main__':
     query = '''
@@ -132,7 +141,6 @@ if __name__ == '__main__':
             '''
 
     df = pd_query(query)
-    cv = cvfolds(df)
 
     features = ['year', 'month', 'dayofmonth', 'week', 'dayofweek', 'minofday']
     label = 'waittime'

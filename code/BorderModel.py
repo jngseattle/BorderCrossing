@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 import datetime
+import pdb
+
 
 class BorderData(object):
     '''
@@ -16,11 +18,11 @@ class BorderData(object):
             y_train: label series for training set
             y_test: label series for test set
     '''
-    def __init__(self, df, cv, label='waittime'):
+    def __init__(self, df, years=3, label='waittime'):
         '''
         IN
             df: dataframe with date, features and label
-            cv: cross validation folds
+            years: number of years in a train/test group
             label: label for y
         '''
         self.df = df.copy()
@@ -34,8 +36,14 @@ class BorderData(object):
 
         self.label = label
         self.y = df[label]
-        self.cv_train = cv[:-1]
-        self.test_indices = cv[-1][1]
+
+        # cv can be used for training with all data
+        self.cv = self.cvfolds(years)
+
+        # When optimizing model, most current year (e.g., 2015) is test set
+        # all other years are training set
+        self.cv_train = self.cv[:-1]
+        self.test_indices = self.cv[-1][1]
         self.prepare_train_test()
 
     def prepare_train_test(self):
@@ -49,15 +57,21 @@ class BorderData(object):
         self.X_train = np.delete(np.array(self.X), self.test_indices, 0)
         self.y_train = np.delete(np.array(self.y), self.test_indices, 0)
 
-    def baseline_model(self):
+    def baseline_model(self, label='waittime'):
         '''
         Return dataframe of last year of training set averaged over day of week
         '''
         low = self.cv_train[-1][1][0]
         high = self.cv_train[-1][1][-1]
-        return pd.DataFrame(self.df.iloc[low:high + 1]
-                            .groupby(['dayofweek', 'minofday'])
-                            .waittime.mean())
+        df = pd.DataFrame(self.df.iloc[low:high + 1]
+                          .groupby(['dayofweek', 'minofday'])[label]
+                          .mean())
+
+        df.columns = ['baseline']
+
+        return self.df_last().reset_index() \
+                   .merge(df.reset_index(), on=['dayofweek', 'minofday']) \
+                   .set_index('date')
 
     def prediction(self, model):
         '''
@@ -66,18 +80,24 @@ class BorderData(object):
         OUT
             Dataframe of test set with predictions for plotting
         '''
-        df = self.df.copy()
-        df = df.set_index('date')
-        df = df.iloc[self.test_indices[0]:self.test_indices[-1] + 1]
+        df = self.df_last()
 
         df['prediction'] = model.predict(self.X_test)
         return df
 
-    def cvfolds(self, years=3):
+    def df_last(self):
+        '''
+        Returns dataframe for last fold in data
+        '''
+        df = self.df.copy()
+        df = df.set_index('date')
+        return df.iloc[self.test_indices[0]:self.test_indices[-1] + 1]
+
+    def cvfolds(self, years):
         '''
         IN
             X: dataframe with date column, assumed ordered by date
-            years: number of years for group; 2 train + 1 test
+            years: number of years for group; 3 --> 2 train + 1 test
         OUT
             Train/test indices to split data in train test sets.
         '''
@@ -99,6 +119,15 @@ class BorderData(object):
 
         return np.array(cv)
 
+    def plot(self, model, start, end):
+        predict = self.prediction(model)
+        baseline = self.baseline_model()
+
+        df = baseline.join(predict[['prediction']])
+        df = df.loc[(df.index > start) & (df.index <= end)]
+        df[['waittime', 'baseline', 'prediction']].plot(figsize=(14, 6),
+                                                        alpha=.5)
+
 
 def clean_df_subset(df, subset, label='waittime'):
     '''
@@ -112,29 +141,3 @@ def clean_df_subset(df, subset, label='waittime'):
     dfnew = df[['date', label]]
     dfnew = dfnew.join(df[subset])
     return dfnew
-
-
-def cvfolds(X, years=3):
-    '''
-    IN
-        X: dataframe with date column, assumed ordered by date
-        years: number of years for group; 2 train + 1 test
-    OUT
-        Train/test indices to split data in train test sets.
-    '''
-    min_year = X.date.min().year
-    max_year = X.date.max().year
-
-    cv = []
-    test_year = min_year + years - 1
-
-    while test_year <= max_year:
-        train = X[(X.date >= datetime.date(test_year - years + 1, 1, 1))
-                  & (X.date < datetime.date(test_year, 1, 1))]
-        test = X[(X.date >= datetime.date(test_year, 1, 1))
-                 & (X.date < datetime.date(test_year + 1, 1, 1))]
-        cv.append((list(train.index), list(test.index)))
-
-        test_year += 1
-
-    return cv
