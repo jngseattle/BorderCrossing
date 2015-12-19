@@ -4,6 +4,7 @@ import datetime
 import pdb
 from sklearn.metrics import r2_score, mean_squared_error, explained_variance_score
 
+
 class BorderData(object):
     '''
         ATTRIBUTES
@@ -103,6 +104,7 @@ class BorderData(object):
         df = df.set_index('date')
         return df.iloc[self.test_indices[0]:self.test_indices[-1] + 1]
 
+    # TODO: support for skipped years - LOW priority
     def cvfolds(self, years):
         '''
         IN
@@ -123,6 +125,7 @@ class BorderData(object):
                        & (df.date < datetime.date(test_year, 1, 1))]
             test = df[(df.date >= datetime.date(test_year, 1, 1))
                       & (df.date < datetime.date(test_year + 1, 1, 1))]
+
             cv.append((list(train.index), list(test.index)))
 
             test_year += 1
@@ -154,8 +157,9 @@ class BorderData(object):
         # Built-in model metrics
         if hasattr(model, 'oob_score_'):
             print "OOB: ", model.oob_score_
-        if hasattr(model, 'best_score_'):
-            print "Best score: ", model.best_score_
+        if hasattr(model, 'best_estimator_'):
+            if hasattr(model.best_estimator_, 'best_score_'):
+                print "Best score: ", model.best_estimator_.best_score_
 
         # MSE
         df = self.df_last()
