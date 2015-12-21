@@ -115,6 +115,7 @@ class BorderData(object):
         df = self.df_last()
 
         df['prediction'] = model.predict(self.X_test)
+        df.prediction = df.prediction.clip(lower=0)
 
         self.yhat = df['prediction']
         return df
@@ -178,11 +179,11 @@ class BorderData(object):
             model: trained sklearn model object
         '''
         # Built-in model metrics
-        if hasattr(model, 'oob_score_'):
-            print "OOB: ", model.oob_score_
         if hasattr(model, 'best_estimator_'):
-            if hasattr(model.best_estimator_, 'best_score_'):
-                print "Best score: ", model.best_estimator_.best_score_
+            if hasattr(model.best_estimator_, 'oob_score_'):
+                print "OOB: ", model.best_estimator_.oob_score_
+        if hasattr(model, 'best_score_'):
+            print "Best score: ", model.best_score_
 
         # MSE
         df = self.df_last()
