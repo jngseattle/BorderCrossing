@@ -5,6 +5,29 @@ import pdb
 from sklearn.metrics import r2_score, mean_squared_error, explained_variance_score
 
 
+class Cleanser(object):
+    def __init__(self, crossing_id):
+        '''
+        Load all data for crossing
+        '''
+        pass
+
+    def smooth_day(self, date, datapoints=12, method='slinear'):
+        '''
+        LOWESS smoothing on a single day of data
+
+        IN
+            date: datetime.date object for day to smooth
+            datapoints: number of points to smooth
+                        default of 12 corresponds to 1 hour smoothing
+                        for 5 min grain
+            method: interpolation method, see pandas interpolation docs
+        OUT
+
+        '''
+        pass
+
+
 class BorderData(object):
     '''
         ATTRIBUTES
@@ -194,3 +217,25 @@ def clean_df_subset(df, subset, label='waittime'):
     dfnew = df[['date', label]]
     dfnew = dfnew.join(df[subset])
     return dfnew
+
+
+def create_dummies(df, cols):
+    '''
+    IN
+        df - original dataframe
+        cols - list of categorical columns
+    OUT
+        dataframe of only categorical dummy columns
+    '''
+    newdf = df.copy()
+    newdf['i'] = newdf.index.values   # adding a column just for join purposes
+    newdf = newdf[['i']]
+
+    for col in cols:
+        newdf = newdf.join(pd.get_dummies(df[col], prefix=col))
+        # Drop a dummy variable from each column to remove colinearity
+        newdf = newdf.drop(newdf.columns[len(newdf.columns) - 1], axis=1)
+
+    newdf = newdf.drop('i', axis=1)
+
+    return newdf
