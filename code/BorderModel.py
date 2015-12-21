@@ -220,11 +220,12 @@ def clean_df_subset(df, subset, label='waittime'):
     return dfnew
 
 
-def create_dummies(df, cols):
+def create_dummies(df, cols, drop=False):
     '''
     IN
         df - original dataframe
         cols - list of categorical columns
+        drop - boolean for dropping columns for linear models
     OUT
         dataframe of only categorical dummy columns
     '''
@@ -235,7 +236,8 @@ def create_dummies(df, cols):
     for col in cols:
         newdf = newdf.join(pd.get_dummies(df[col], prefix=col))
         # Drop a dummy variable from each column to remove colinearity
-        newdf = newdf.drop(newdf.columns[len(newdf.columns) - 1], axis=1)
+        if drop:
+            newdf = newdf.drop(newdf.columns[len(newdf.columns) - 1], axis=1)
 
     newdf = newdf.drop('i', axis=1)
 
