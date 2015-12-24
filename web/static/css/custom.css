@@ -5,10 +5,18 @@
   stroke-width: 3px;
 }
 
+.ct-series-a .ct-area {
+    fill: #ff6600;
+}
+
 .ct-series-b .ct-line {
   opacity: .3;
   stroke: #006687;
   stroke-width: 2px;
+}
+
+.ct-series-b .ct-area {
+    fill: none;
 }
 
 .ct-label {

@@ -8,8 +8,8 @@
       <div class="panel-heading">
         <h3 class="panel-title">
             <div class="row">
-                <div class="col-lg-10"><h3>Predicted Delay</h3></div>
-                <div class="col-lg-2">
+                <div class="col-xs-10"><h3>Predicted Delay</h3></div>
+                <div class="col-xs-2">
                     <div class="input-group date">
                       <input type="text" class="form-control" value="{{default_date}}">
                       <span class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
@@ -20,11 +20,31 @@
       </div>
     </div>
     <div class="panel-body">
-        <div class="col-lg-8">
+        <div class="col-xs-9">
             <div class="ct-chart ct-octave"></div>
         </div>
-        <div class="col-lg-1"></div>
-        <div class="col-lg-2">
+        <div class="col-xs-3">
+            <div class="row">
+                <h3>{{dow}}, {{default_date}}</h3>
+            </div>
+            <div class="row">
+                <div class="btn-group btn-group-justified" role="group" aria-label="...">
+                    <a href="/predict/{{last_week}}/{{location|e}}" class="btn btn-default btn-sm" role="button">
+                        <span class="glyphicon glyphicon-chevron-left" aria-hidden="true"></span>
+                        <span class="glyphicon glyphicon-chevron-left" aria-hidden="true"></span>
+                    </a>
+                    <a href="/predict/{{yesterday}}/{{location|e}}" class="btn btn-default btn-sm" role="button">
+                        <span class="glyphicon glyphicon-chevron-left" aria-hidden="true"></span>
+                    </a>
+                    <a href="/predict/{{tomorrow}}/{{location|e}}" class="btn btn-default btn-sm" role="button">
+                        <span class="glyphicon glyphicon-chevron-right" aria-hidden="true"></span>
+                    </a>
+                    <a href="/predict/{{next_week}}/{{location|e}}" class="btn btn-default btn-sm" role="button">
+                        <span class="glyphicon glyphicon-chevron-right" aria-hidden="true"></span>
+                        <span class="glyphicon glyphicon-chevron-right" aria-hidden="true"></span>
+                    </a>
+                    </div>
+            </div>
             <div class="row top30"></div>
             <div class="row">
                 <div class="btn-group btn-block">
@@ -42,7 +62,6 @@
             <div class="row top10"></div>
             <div class="row"><button type="button" class="btn btn-info btn-block" disabled="disabled">{{lane}}</button></div>
         </div>
-        <div class="col-lg-1"></div>
     </div>
 {% endblock %}
 
@@ -68,6 +87,7 @@ var data = {
 var options = {
     showPoint: false,
     low: 0,
+    showArea: true,
     lineSmooth: Chartist.Interpolation.cardinal({
         tension: 0,
         fillHoles: true
@@ -107,16 +127,11 @@ chart = new Chartist.Line('.ct-chart', data, options);
 
 // Animation of line
 chart.on('draw', function(data) {
-  if(data.type === 'line') {
+  if(data.type === 'bar') {
     data.element.animate({
-      opacity: {
-        dur: 500,
-        from: 0,
-        to: 1
-      },
       d: {
-        begin: 200 * data.index,
-        dur: 1500,
+        begin: 100 * data.index,
+        dur: 1000,
         from: data.path.clone().scale(1, 0).translate(0, data.chartRect.height()).stringify(),
         to: data.path.clone().stringify(),
         easing: Chartist.Svg.Easing.easeOutQuint

@@ -48,15 +48,31 @@ def prediction_page(date, location, direction='Southbound', lane='Car'):
     date_formatted = datetime.datetime \
         .strptime(date, '%Y-%m-%d').strftime('%m/%d/%Y')
 
+    # Dates for arrow buttons
+    next_week = start + datetime.timedelta(days=7)
+    next_week = next_week.strftime('%Y-%m-%d')
+    last_week = start - datetime.timedelta(days=7)
+    last_week = last_week.strftime('%Y-%m-%d')
+    tomorrow = start + datetime.timedelta(days=1)
+    tomorrow = tomorrow.strftime('%Y-%m-%d')
+    yesterday = start - datetime.timedelta(days=1)
+    yesterday = yesterday.strftime('%Y-%m-%d')
+
     return render_template('chart.html',
                            date=date,
                            default_date=date_formatted,
+                           dow=start.strftime("%A"),
                            location=location,
                            direction=direction,
                            lane=lane,
                            predict=list(results.predict),
                            baseline=list(results.baseline),
-                           labels=labels)
+                           labels=labels,
+                           next_week=next_week,
+                           last_week=last_week,
+                           tomorrow=tomorrow,
+                           yesterday=yesterday
+                           )
 
 
 @app.route('/chart')
