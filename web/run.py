@@ -28,23 +28,35 @@ def index():
 @app.route('/predict/<date>/<location>')
 @app.route('/predict/<date>/<location>/<direction>')
 @app.route('/predict/<date>/<location>/<direction>/<lane>')
-def prediction_page(date, location, direction='Southbound', lane='Cars'):
-    results = daily_prediction(date, location, direction, lane)
+def prediction_page(date, location, direction='Southbound', lane='Car'):
+    # Get predictions
+    start = datetime.datetime.strptime(date, '%Y-%m-%d')
+    results = daily_prediction(start, location, direction, lane)
 
-    # TODO: check for None from results
-    labels, values = results
+    # Create labels by hour
+    labels = []
+    time = datetime.datetime(2008, 4, 11)      # Actual date is immaterial
+    end = time + datetime.timedelta(hours=24)
+    while time < end:
+        if time.minute == 0 and time.hour % 2 == 0:
+            labels.append(str(time.time())[:-3])
+        else:
+            labels.append("")
+        time += datetime.timedelta(minutes=30)
 
-    date_formatted = datetime.datetime.strptime(date, '%Y-%m-%d') \
-                     .strftime('%m/%d/%Y')
+    # Date formatting for calendar control
+    date_formatted = datetime.datetime \
+        .strptime(date, '%Y-%m-%d').strftime('%m/%d/%Y')
 
     return render_template('chart.html',
-                            date=date,
-                            default_date=date_formatted,
-                            location=location,
-                            direction=direction,
-                            lane=lane,
-                            values=values,
-                            labels=labels)
+                           date=date,
+                           default_date=date_formatted,
+                           location=location,
+                           direction=direction,
+                           lane=lane,
+                           predict=list(results.predict),
+                           baseline=list(results.baseline),
+                           labels=labels)
 
 
 @app.route('/chart')

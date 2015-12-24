@@ -1,69 +1,74 @@
 import cPickle as pickle
 import datetime
 import random
-from dbhelper import pd_query
+from dbhelper import pd_query, get_crossings
+import pdb
 
 
-with open('../models/rf_v0.1.small.pkl') as f:
-    model = pickle.load(f)
+# Set globals
+# TODO: read from config file - LOW PRI
+CROSSINGS = get_crossings()
+MUNGER = 2
+PMODEL = 'v0.5'      # Prediction model
+BMODEL = 'b2014'     # Baseline model
 
 
-def get_features(start, end):
+def predict(location, direction, lane, start, end):
+    '''
+    IN
+        location: name of crossing
+        direction: name of direction
+        lane: name of lane
+        start: datetime
+        end: datetime
+    OUT
+        dataframe with date, prediction and baseline
+    '''
+    xid = CROSSINGS[(CROSSINGS.location_name == location)
+                    & (CROSSINGS.direction_name == direction)
+                    & (CROSSINGS.lane_name == lane)].index[0]
+
+    if id is None:
+        raise RuntimeError('Crossing not matched for: ', location,
+                           direction, lane)
+
     query = '''
-            select year, month, dayofweek, minofday
-            from datefeatures
-            where date >= '%s' and date <'%s'
-            order by date
+            select
+                p.date,
+                p.waittime as predict,
+                b.waittime as baseline
+            from predictions p
+            inner join predictions b
+                on p.date = b.date
+                and b.crossing_id = {3}
+                and b.munger_id = '{2}'
+                and b.model_version = '{1}'
+            where
+                p.date >= '{4}' and p.date < '{5}'
+                and p.crossing_id = {3}
+                and p.munger_id = '{2}'
+                and p.model_version = '{0}'
+            order by p.date
             '''
-    return pd_query(query, (start, end))
+
+    df = pd_query(query.format(PMODEL, BMODEL, MUNGER, xid, start, end))
+    return df
 
 
-def predict(start, end):
-    X = get_features(start, end)
-    yhat = model.predict(X)
-    return yhat
-
-
-def daily_prediction(date, location, direction='Southbound', lane='Cars'):
-    start = datetime.datetime.strptime(date, '%Y-%m-%d')
+def daily_prediction(start, location, direction='Southbound', lane='Car'):
+    '''
+    IN
+        start: datetime
+        location: name of crossing
+        direction: name of direction
+        lane: name of lane
+    '''
     end = start + datetime.timedelta(hours=24)
-    values = predict(start, end)
+    df = predict(location, direction, lane, start, end)
 
-    time = start
-
-    labels = []
-    # values = []
-    while time < end:
-        # values.append(random.randint(0, 90))
-
-        if time.minute == 0:
-            labels.append(str(time.time())[:-3])
-        else:
-            labels.append("")
-        time += datetime.timedelta(minutes=5)
-
-    return labels, values
-
-
-def daily_prediction_test(date, location, direction='Southbound', lane='Cars'):
-    start = datetime.datetime(2016, 2, 19)      # Actual date is immaterial
-    end = start + datetime.timedelta(hours=24)
-    time = start
-
-    labels = []
-    values = []
-    while time < end:
-        values.append(random.randint(0, 90))
-
-        if time.minute == 0:
-            labels.append(str(time.time())[:-3])
-        else:
-            labels.append("")
-        time += datetime.timedelta(minutes=5)
-
-    return labels, values
+    return df
 
 
 if __name__ == '__main__':
-    delays = daily_prediction(datetime.date('2/9/2016'), 'Peace Arch')
+    delays = daily_prediction(datetime.datetime(2016, 1, 10), 'Pacific Highway')
     print delays[:50]

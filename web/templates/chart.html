@@ -61,8 +61,8 @@ $('.input-group.date').datepicker()
 </script>
 <script>
 var data = {
-    labels : [{% for item in labels %}"{{item}}",{% endfor %}],
-    series : [[{% for item in values %}{{item}},{% endfor %}]]
+    labels : {{ labels|safe }},
+    series : [ {{ predict|safe }}, {{ baseline|safe }} ]
 };
 
 var options = {
@@ -115,8 +115,8 @@ chart.on('draw', function(data) {
         to: 1
       },
       d: {
-        begin: 1000 * data.index,
-        dur: 1000,
+        begin: 200 * data.index,
+        dur: 1500,
         from: data.path.clone().scale(1, 0).translate(0, data.chartRect.height()).stringify(),
         to: data.path.clone().stringify(),
         easing: Chartist.Svg.Easing.easeOutQuint
