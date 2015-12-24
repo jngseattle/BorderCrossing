@@ -2,7 +2,9 @@ import numpy as np
 import pandas as pd
 import datetime
 import pdb
-from sklearn.metrics import r2_score, mean_squared_error, explained_variance_score
+from sklearn.metrics import r2_score, mean_squared_error, \
+    explained_variance_score
+from scipy.optimize import minimize
 
 
 class Cleanser(object):
@@ -74,7 +76,6 @@ class BorderData(object):
         self.prepare_train_test()
         self.baseline = self.baseline_model()['baseline']
 
-
     def prepare_train_test(self):
         '''
         Create train test set
@@ -119,6 +120,25 @@ class BorderData(object):
 
         self.yhat = df['prediction']
         return df
+
+    def predict_ensemble(self, model=None):
+        '''
+        Calculates harmonic mean
+        IN
+            model (optional)
+        OUT
+            TBD
+        '''
+        if self.yhat is None and model is None:
+            raise RuntimeError('model parameter missing')
+
+        if model is not None and self.yhat is None:
+            self.predict(model)
+
+        if self.yhat is not None:
+            wy, wb = calculate_weights(self.y_test, (self.yhat, self.baseline))
+            self.ensemble = harmonic_mean((self.yhat, self.baseline), (wy, wb))
+            self.weights = (wy, wb)
 
     def df_last(self):
         '''
@@ -188,22 +208,29 @@ class BorderData(object):
         # MSE
         df = self.df_last()
         print "** MSE for last cv fold **"
-        print "Baseline : ", mean_squared_error(df.waittime.values,
-                                                self.baseline.values)
-        print "Model    : ", mean_squared_error(df.waittime.values,
-                                                self.yhat.values)
+        print "Baseline : ", mean_squared_error(self.y_test, self.baseline)
+        print "Model    : ", mean_squared_error(self.y_test, self.yhat)
+        if hasattr(self, 'ensemble'):
+            print "Ensemble : ", mean_squared_error(self.y_test,
+                                                    self.ensemble)
+            print "Weights  : ", str(self.weights)
 
         # R^2
         print "** R^2 for last cv fold **"
-        print "Baseline : ", r2_score(df.waittime.values, self.baseline.values)
-        print 'Model    : ', r2_score(df.waittime.values, self.yhat.values)
+        print "Baseline : ", r2_score(self.y_test, self.baseline)
+        print 'Model    : ', r2_score(self.y_test, self.yhat)
+        if hasattr(self, 'ensemble'):
+            print "Ensemble : ", r2_score(self.y_test, self.ensemble)
 
         # Explained Variance
         print "** Explained variance for last cv fold **"
-        print "Baseline : ", explained_variance_score(df.waittime.values,
-                                                      self.baseline.values)
-        print 'Model    : ', explained_variance_score(df.waittime.values,
-                                                      self.yhat.values)
+        print "Baseline : ", explained_variance_score(self.y_test,
+                                                      self.baseline)
+        print 'Model    : ', explained_variance_score(self.y_test,
+                                                      self.yhat)
+        if hasattr(self, 'ensemble'):
+            print "Ensemble : ", explained_variance_score(self.y_test,
+                                                          self.ensemble)
 
 
 def clean_df_subset(df, subset, label='waittime'):
@@ -242,3 +269,38 @@ def create_dummies(df, cols, drop=False):
     newdf = newdf.drop('i', axis=1)
 
     return newdf
+
+
+def harmonic_mean(data, weights):
+    '''
+    IN
+        data: list of lists of predictions
+        weights: list of weights
+    OUT
+        harmonic mean
+    '''
+    denom = sum([w / d for w, d in zip(weights, data)])
+    return sum(weights) / denom
+
+
+def calculate_weights(target, predict):
+    '''
+    IN
+        target: actual values
+        predict: list of predictions
+    OUT
+        list of weights
+    '''
+    res = minimize(_mse, [2, 1], args=(target, predict))
+    return res.x
+
+
+def _mse(weights, target, predict):
+    '''
+    IN
+        target: actual values
+        predict: list of predictions
+    OUT
+        MSE
+    '''
+    return mean_squared_error(target, harmonic_mean(predict, weights))
