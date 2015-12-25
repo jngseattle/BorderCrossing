@@ -4,7 +4,7 @@
 
 -- Dumped from database version 9.4.4
 -- Dumped by pg_dump version 9.4.0
--- Started on 2015-12-23 14:23:46 PST
+-- Started on 2015-12-25 14:46:33 PST
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -14,7 +14,7 @@ SET check_function_bodies = false;
 SET client_min_messages = warning;
 
 --
--- TOC entry 190 (class 3079 OID 12123)
+-- TOC entry 191 (class 3079 OID 12123)
 -- Name: plpgsql; Type: EXTENSION; Schema: -; Owner: 
 --
 
@@ -22,8 +22,8 @@ CREATE EXTENSION IF NOT EXISTS plpgsql WITH SCHEMA pg_catalog;
 
 
 --
--- TOC entry 2406 (class 0 OID 0)
--- Dependencies: 190
+-- TOC entry 2413 (class 0 OID 0)
+-- Dependencies: 191
 -- Name: EXTENSION plpgsql; Type: COMMENT; Schema: -; Owner: 
 --
 
@@ -210,7 +210,8 @@ CREATE TABLE mungedata (
     munger_id integer NOT NULL,
     crossing_id integer NOT NULL,
     date timestamp without time zone NOT NULL,
-    waittime real
+    metric real,
+    is_waittime boolean DEFAULT true NOT NULL
 );
 
 
@@ -236,7 +237,7 @@ ALTER TABLE munger OWNER TO jng;
 --
 
 CREATE TABLE predictions (
-    munge_id integer NOT NULL,
+    munger_id integer NOT NULL,
     date timestamp without time zone NOT NULL,
     waittime double precision NOT NULL,
     crossing_id integer NOT NULL,
@@ -290,6 +291,20 @@ CREATE TABLE skiconditions (
 
 
 ALTER TABLE skiconditions OWNER TO jng;
+
+--
+-- TOC entry 190 (class 1259 OID 16849)
+-- Name: specialdates; Type: TABLE; Schema: public; Owner: jng; Tablespace: 
+--
+
+CREATE TABLE specialdates (
+    date date NOT NULL,
+    locale character(2) NOT NULL,
+    event character varying(30)
+);
+
+
+ALTER TABLE specialdates OWNER TO jng;
 
 --
 -- TOC entry 182 (class 1259 OID 16549)
@@ -353,7 +368,7 @@ CREATE TABLE weather_raw (
 ALTER TABLE weather_raw OWNER TO jng;
 
 --
--- TOC entry 2239 (class 2606 OID 16553)
+-- TOC entry 2244 (class 2606 OID 16553)
 -- Name: crossing_id_pkey; Type: CONSTRAINT; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -362,7 +377,7 @@ ALTER TABLE ONLY crossing
 
 
 --
--- TOC entry 2244 (class 2606 OID 16558)
+-- TOC entry 2249 (class 2606 OID 16558)
 -- Name: crossingdata_date_crossing_id_pkey; Type: CONSTRAINT; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -371,7 +386,7 @@ ALTER TABLE ONLY crossingdata
 
 
 --
--- TOC entry 2266 (class 2606 OID 16648)
+-- TOC entry 2271 (class 2606 OID 16648)
 -- Name: datefeatures_pkey; Type: CONSTRAINT; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -380,7 +395,7 @@ ALTER TABLE ONLY datefeatures
 
 
 --
--- TOC entry 2246 (class 2606 OID 16561)
+-- TOC entry 2251 (class 2606 OID 16561)
 -- Name: direction_id_pkey; Type: CONSTRAINT; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -389,7 +404,7 @@ ALTER TABLE ONLY direction
 
 
 --
--- TOC entry 2249 (class 2606 OID 16564)
+-- TOC entry 2254 (class 2606 OID 16564)
 -- Name: lane_id_pkey; Type: CONSTRAINT; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -398,7 +413,7 @@ ALTER TABLE ONLY lane
 
 
 --
--- TOC entry 2257 (class 2606 OID 16571)
+-- TOC entry 2262 (class 2606 OID 16571)
 -- Name: location_direction_location_id_direction_id_pkey; Type: CONSTRAINT; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -407,7 +422,7 @@ ALTER TABLE ONLY location_direction
 
 
 --
--- TOC entry 2253 (class 2606 OID 16567)
+-- TOC entry 2258 (class 2606 OID 16567)
 -- Name: location_id_pkey; Type: CONSTRAINT; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -416,7 +431,7 @@ ALTER TABLE ONLY location
 
 
 --
--- TOC entry 2260 (class 2606 OID 16574)
+-- TOC entry 2265 (class 2606 OID 16574)
 -- Name: location_lane_location_id_lane_id_pkey; Type: CONSTRAINT; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -425,7 +440,7 @@ ALTER TABLE ONLY location_lane
 
 
 --
--- TOC entry 2274 (class 2606 OID 16832)
+-- TOC entry 2279 (class 2606 OID 16832)
 -- Name: model_pkey; Type: CONSTRAINT; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -434,16 +449,16 @@ ALTER TABLE ONLY model
 
 
 --
--- TOC entry 2272 (class 2606 OID 16713)
+-- TOC entry 2277 (class 2606 OID 16848)
 -- Name: mungedata_pkey; Type: CONSTRAINT; Schema: public; Owner: jng; Tablespace: 
 --
 
 ALTER TABLE ONLY mungedata
-    ADD CONSTRAINT mungedata_pkey PRIMARY KEY (munger_id, crossing_id, date);
+    ADD CONSTRAINT mungedata_pkey PRIMARY KEY (munger_id, crossing_id, is_waittime, date);
 
 
 --
--- TOC entry 2270 (class 2606 OID 16701)
+-- TOC entry 2275 (class 2606 OID 16701)
 -- Name: munger_pkey; Type: CONSTRAINT; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -452,16 +467,16 @@ ALTER TABLE ONLY munger
 
 
 --
--- TOC entry 2276 (class 2606 OID 16820)
+-- TOC entry 2281 (class 2606 OID 16820)
 -- Name: predictions_pkey; Type: CONSTRAINT; Schema: public; Owner: jng; Tablespace: 
 --
 
 ALTER TABLE ONLY predictions
-    ADD CONSTRAINT predictions_pkey PRIMARY KEY (model_version, munge_id, crossing_id, date);
+    ADD CONSTRAINT predictions_pkey PRIMARY KEY (model_version, munger_id, crossing_id, date);
 
 
 --
--- TOC entry 2268 (class 2606 OID 16760)
+-- TOC entry 2273 (class 2606 OID 16760)
 -- Name: publicholiday_pkey; Type: CONSTRAINT; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -470,7 +485,7 @@ ALTER TABLE ONLY publicholiday
 
 
 --
--- TOC entry 2262 (class 2606 OID 16577)
+-- TOC entry 2267 (class 2606 OID 16577)
 -- Name: skiconditions_date_resort_pkey; Type: CONSTRAINT; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -479,7 +494,16 @@ ALTER TABLE ONLY skiconditions
 
 
 --
--- TOC entry 2264 (class 2606 OID 16579)
+-- TOC entry 2283 (class 2606 OID 16855)
+-- Name: specialdates_pkey; Type: CONSTRAINT; Schema: public; Owner: jng; Tablespace: 
+--
+
+ALTER TABLE ONLY specialdates
+    ADD CONSTRAINT specialdates_pkey PRIMARY KEY (date);
+
+
+--
+-- TOC entry 2269 (class 2606 OID 16579)
 -- Name: weather_date_pkey; Type: CONSTRAINT; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -488,7 +512,7 @@ ALTER TABLE ONLY weather
 
 
 --
--- TOC entry 2237 (class 1259 OID 16555)
+-- TOC entry 2242 (class 1259 OID 16555)
 -- Name: crossing_direction_id; Type: INDEX; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -496,7 +520,7 @@ CREATE INDEX crossing_direction_id ON crossing USING btree (direction_id);
 
 
 --
--- TOC entry 2240 (class 1259 OID 16554)
+-- TOC entry 2245 (class 1259 OID 16554)
 -- Name: crossing_lane_id; Type: INDEX; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -504,7 +528,7 @@ CREATE INDEX crossing_lane_id ON crossing USING btree (lane_id);
 
 
 --
--- TOC entry 2241 (class 1259 OID 16556)
+-- TOC entry 2246 (class 1259 OID 16556)
 -- Name: crossing_location_id; Type: INDEX; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -512,7 +536,7 @@ CREATE INDEX crossing_location_id ON crossing USING btree (location_id);
 
 
 --
--- TOC entry 2242 (class 1259 OID 16559)
+-- TOC entry 2247 (class 1259 OID 16559)
 -- Name: crossingdata_crossing_id; Type: INDEX; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -520,7 +544,7 @@ CREATE INDEX crossingdata_crossing_id ON crossingdata USING btree (crossing_id);
 
 
 --
--- TOC entry 2247 (class 1259 OID 16562)
+-- TOC entry 2252 (class 1259 OID 16562)
 -- Name: direction_name; Type: INDEX; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -528,7 +552,7 @@ CREATE UNIQUE INDEX direction_name ON direction USING btree (name);
 
 
 --
--- TOC entry 2250 (class 1259 OID 16565)
+-- TOC entry 2255 (class 1259 OID 16565)
 -- Name: lane_name; Type: INDEX; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -536,7 +560,7 @@ CREATE UNIQUE INDEX lane_name ON lane USING btree (name);
 
 
 --
--- TOC entry 2255 (class 1259 OID 16572)
+-- TOC entry 2260 (class 1259 OID 16572)
 -- Name: location_direction_direction_id; Type: INDEX; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -544,7 +568,7 @@ CREATE INDEX location_direction_direction_id ON location_direction USING btree (
 
 
 --
--- TOC entry 2251 (class 1259 OID 16569)
+-- TOC entry 2256 (class 1259 OID 16569)
 -- Name: location_fullname; Type: INDEX; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -552,7 +576,7 @@ CREATE UNIQUE INDEX location_fullname ON location USING btree (fullname);
 
 
 --
--- TOC entry 2258 (class 1259 OID 16575)
+-- TOC entry 2263 (class 1259 OID 16575)
 -- Name: location_lane_lane_id; Type: INDEX; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -560,7 +584,7 @@ CREATE INDEX location_lane_lane_id ON location_lane USING btree (lane_id);
 
 
 --
--- TOC entry 2254 (class 1259 OID 16568)
+-- TOC entry 2259 (class 1259 OID 16568)
 -- Name: location_name; Type: INDEX; Schema: public; Owner: jng; Tablespace: 
 --
 
@@ -568,7 +592,7 @@ CREATE UNIQUE INDEX location_name ON location USING btree (name);
 
 
 --
--- TOC entry 2277 (class 2606 OID 16580)
+-- TOC entry 2284 (class 2606 OID 16580)
 -- Name: crossing_direction_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jng
 --
 
@@ -577,7 +601,7 @@ ALTER TABLE ONLY crossing
 
 
 --
--- TOC entry 2278 (class 2606 OID 16585)
+-- TOC entry 2285 (class 2606 OID 16585)
 -- Name: crossing_lane_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jng
 --
 
@@ -586,7 +610,7 @@ ALTER TABLE ONLY crossing
 
 
 --
--- TOC entry 2279 (class 2606 OID 16590)
+-- TOC entry 2286 (class 2606 OID 16590)
 -- Name: crossing_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jng
 --
 
@@ -595,7 +619,7 @@ ALTER TABLE ONLY crossing
 
 
 --
--- TOC entry 2280 (class 2606 OID 16595)
+-- TOC entry 2287 (class 2606 OID 16595)
 -- Name: crossingdata_crossing_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jng
 --
 
@@ -604,7 +628,7 @@ ALTER TABLE ONLY crossingdata
 
 
 --
--- TOC entry 2281 (class 2606 OID 16600)
+-- TOC entry 2288 (class 2606 OID 16600)
 -- Name: location_direction_direction_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jng
 --
 
@@ -613,7 +637,7 @@ ALTER TABLE ONLY location_direction
 
 
 --
--- TOC entry 2282 (class 2606 OID 16605)
+-- TOC entry 2289 (class 2606 OID 16605)
 -- Name: location_direction_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jng
 --
 
@@ -622,7 +646,7 @@ ALTER TABLE ONLY location_direction
 
 
 --
--- TOC entry 2283 (class 2606 OID 16610)
+-- TOC entry 2290 (class 2606 OID 16610)
 -- Name: location_lane_lane_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jng
 --
 
@@ -631,7 +655,7 @@ ALTER TABLE ONLY location_lane
 
 
 --
--- TOC entry 2284 (class 2606 OID 16615)
+-- TOC entry 2291 (class 2606 OID 16615)
 -- Name: location_lane_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jng
 --
 
@@ -640,7 +664,7 @@ ALTER TABLE ONLY location_lane
 
 
 --
--- TOC entry 2286 (class 2606 OID 16719)
+-- TOC entry 2293 (class 2606 OID 16719)
 -- Name: mungedata_crossing_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jng
 --
 
@@ -649,7 +673,7 @@ ALTER TABLE ONLY mungedata
 
 
 --
--- TOC entry 2285 (class 2606 OID 16714)
+-- TOC entry 2292 (class 2606 OID 16714)
 -- Name: mungedata_munger_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jng
 --
 
@@ -658,7 +682,7 @@ ALTER TABLE ONLY mungedata
 
 
 --
--- TOC entry 2287 (class 2606 OID 16821)
+-- TOC entry 2294 (class 2606 OID 16821)
 -- Name: predictions_crossing_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jng
 --
 
@@ -667,7 +691,7 @@ ALTER TABLE ONLY predictions
 
 
 --
--- TOC entry 2289 (class 2606 OID 16833)
+-- TOC entry 2296 (class 2606 OID 16833)
 -- Name: predictions_model_version_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jng
 --
 
@@ -676,16 +700,16 @@ ALTER TABLE ONLY predictions
 
 
 --
--- TOC entry 2288 (class 2606 OID 16826)
+-- TOC entry 2295 (class 2606 OID 16826)
 -- Name: predictions_munge_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: jng
 --
 
 ALTER TABLE ONLY predictions
-    ADD CONSTRAINT predictions_munge_id_fkey FOREIGN KEY (munge_id) REFERENCES munger(id);
+    ADD CONSTRAINT predictions_munge_id_fkey FOREIGN KEY (munger_id) REFERENCES munger(id);
 
 
 --
--- TOC entry 2405 (class 0 OID 0)
+-- TOC entry 2412 (class 0 OID 0)
 -- Dependencies: 5
 -- Name: public; Type: ACL; Schema: -; Owner: jng
 --
@@ -696,7 +720,7 @@ GRANT ALL ON SCHEMA public TO jng;
 GRANT ALL ON SCHEMA public TO PUBLIC;
 
 
--- Completed on 2015-12-23 14:23:46 PST
+-- Completed on 2015-12-25 14:46:34 PST
 
 --
 -- PostgreSQL database dump complete
