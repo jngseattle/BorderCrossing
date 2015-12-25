@@ -5,29 +5,8 @@ import pdb
 from sklearn.metrics import r2_score, mean_squared_error, \
     explained_variance_score
 from scipy.optimize import minimize
-
-
-class Cleanser(object):
-    def __init__(self, crossing_id):
-        '''
-        Load all data for crossing
-        '''
-        pass
-
-    def smooth_day(self, date, datapoints=12, method='slinear'):
-        '''
-        LOWESS smoothing on a single day of data
-
-        IN
-            date: datetime.date object for day to smooth
-            datapoints: number of points to smooth
-                        default of 12 corresponds to 1 hour smoothing
-                        for 5 min grain
-            method: interpolation method, see pandas interpolation docs
-        OUT
-
-        '''
-        pass
+from dbhelper import pd_query
+import statsmodels.api as sm
 
 
 class BorderData(object):
@@ -304,3 +283,54 @@ def _mse(weights, target, predict):
         MSE
     '''
     return mean_squared_error(target, harmonic_mean(predict, weights))
+
+
+def smooth(munger_id, crossing_id, field, limit=None, path='../data'):
+    '''
+    Smooth data and write output to CSV
+
+    IN
+        munger_id
+        crossing_id
+        dataframe with date and data field ordered by date
+    OUT
+        None
+    '''
+    query = '''
+            select
+                c.date,
+                {0}
+            from crossingdata c
+            join datefeatures d on c.date = d.date
+            where
+                valid=1
+                and {0} is not null
+                and crossing_id = {1}
+            order by c.date {2};
+            '''
+
+    if limit is not None:
+        limitstring = "limit %s" % (limit)
+    else:
+        limitstring = ""
+    df = pd_query(query.format(field, crossing_id, limitstring))
+
+    lowess = sm.nonparametric.lowess
+    z = lowess(df[field], df.index, frac=12. / len(df), it=1)
+
+    df['smooth'] = z[:, 1]
+    df.smooth = df.smooth.clip_lower(0)
+
+    dfcsv = df.reset_index()[['date', 'smooth']]
+    dfcsv['munger_id'] = munger_id
+    dfcsv['crossing_id'] = crossing_id
+    dfcsv['is_waittime'] = field == 'waittime'
+
+    filepath = '{0}/munge{1}_{2}_{3}.csv'.format(path, munger_id,
+                                                 crossing_id, field)
+    dfcsv.to_csv(filepath,
+                 columns=['munger_id', 'crossing_id', 'date',
+                          'smooth', 'is_waittime'],
+                 index=False, header=False)
+
+    return df
