@@ -35,6 +35,10 @@ class BorderData(object):
         '''
         self.df = df.copy()
         self.date = df['date']
+
+        # Handle event categoricals
+        events = self._event_dummies(df.copy())
+
         self.X = df.drop('date', axis=1)
 
         # Remove labels from X
@@ -46,16 +50,20 @@ class BorderData(object):
         self.y = df[label]
 
         # cv can be used for training with all data
-        self.cv = self.cvfolds(years)
+        self.cv = self._cvfolds(years)
 
         # When optimizing model, most current year (e.g., 2015) is test set
         # all other years are training set
         self.cv_train = self.cv[:-1]
         self.test_indices = self.cv[-1][1]
-        self.prepare_train_test()
+        self._prepare_train_test()
         self.baseline = self.baseline_model()['baseline']
 
-    def prepare_train_test(self):
+    def _event_dummies(self, df):
+        cols = [c for c in df.columns.values if 'event' in col]
+        return create_dummies(df, cols)
+
+    def _prepare_train_test(self):
         '''
         Create train test set
         '''
@@ -78,7 +86,7 @@ class BorderData(object):
 
         df.columns = ['baseline']
 
-        df = self.df_last().reset_index() \
+        df = self._df_last().reset_index() \
                  .merge(df.reset_index(), how='left',
                         on=['dayofweek', 'minofday']).set_index('date') \
                  .sort_index()
@@ -92,7 +100,7 @@ class BorderData(object):
         OUT
             Dataframe of test set with predictions for plotting
         '''
-        df = self.df_last()
+        df = self._df_last()
 
         df['prediction'] = model.predict(self.X_test)
         df.prediction = df.prediction.clip(lower=0)
@@ -119,7 +127,7 @@ class BorderData(object):
             self.ensemble = harmonic_mean((self.yhat, self.baseline), (wy, wb))
             self.weights = (wy, wb)
 
-    def df_last(self):
+    def _df_last(self):
         '''
         Returns dataframe for last fold in data
         '''
@@ -128,7 +136,7 @@ class BorderData(object):
         return df.iloc[self.test_indices[0]:self.test_indices[-1] + 1]
 
     # TODO: support for skipped years - LOW priority
-    def cvfolds(self, years):
+    def _cvfolds(self, years):
         '''
         IN
             X: dataframe with date column, assumed ordered by date
@@ -160,7 +168,7 @@ class BorderData(object):
         Plot waittime, baseline and prediction
         Assumes model has been fit
         '''
-        df = self.df_last()
+        df = self._df_last()
         df['baseline'] = self.baseline
 
         if self.yhat is None:
@@ -185,7 +193,7 @@ class BorderData(object):
             print "Best score: ", model.best_score_
 
         # MSE
-        df = self.df_last()
+        df = self._df_last()
         print "** MSE for last cv fold **"
         print "Baseline : ", mean_squared_error(self.y_test, self.baseline)
         print "Model    : ", mean_squared_error(self.y_test, self.yhat)
