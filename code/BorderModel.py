@@ -57,10 +57,10 @@ class BorderData(object):
         self.cv_train = self.cv[:-1]
         self.test_indices = self.cv[-1][1]
         self._prepare_train_test()
-        self.baseline = self.baseline_model()['baseline']
+        self.baseline = self.baseline_model(label=self.label)['baseline']
 
     def _event_dummies(self, df):
-        cols = [c for c in df.columns.values if 'event' in col]
+        cols = [c for c in df.columns.values if 'event' in c]
         return create_dummies(df, cols)
 
     def _prepare_train_test(self):
@@ -218,6 +218,109 @@ class BorderData(object):
         if hasattr(self, 'ensemble'):
             print "Ensemble : ", explained_variance_score(self.y_test,
                                                           self.ensemble)
+
+
+class BorderImpute(object):
+    '''
+    Class for imputing data using neighbor values as features
+    Assumes 3 part modeling of neighbors
+        * lead + lag effects
+        * lead effects
+        * lag effects
+    Assumes all models will include volume and date features
+    Date features can be overridden
+
+    ATTRIBUTES
+        model_ll
+        model_lead
+        model_lag
+        dfsource: dataframe of source data with neighbor effects
+    '''
+    def __init__(self, start, end, neighborfunc):
+        self.start = start
+        self.end = end
+        pass
+
+    def prepare_source(self, query):
+        '''
+        Select data and prepare for modeling
+        * Raw wait time
+        * Smoothed volume
+        * Date features
+        Add neighbor data
+
+        IN
+            munger_id
+            crossing_id
+        OUT
+            dataframe of prepared source data
+        '''
+        # Get data from DB
+        # Get lead feature as series
+        # Get lag feature as series
+        # Combine in dataframe, excluding NaN
+        pass
+
+    def build_model(self, estimator):
+        '''
+        Run fit for each neighbor model
+        '''
+        self.model_ll = copy.copy(estimator)
+        self.model_ll.fit(Xy_laglead(self.sourcedf, lag=True, lead=True))
+
+        self.model_lead = copy.copy(estimator)
+        self.model_lead.fit(Xy_laglead(self.sourcedf, lead=True))
+
+        self.model_lag = copy.copy(estimator)
+        self.model_lag.fit(Xy_laglead(self.sourcedf, lag=True))
+
+
+def Xy_laglead(df, label='waittime', lead=False, lag=False,
+               leadcols=['lead'], lagcols=['lag']):
+    '''
+    Prepare data with lag lead columns for modeling
+    Note that lag and lead at data boundaries will have NaN values
+    that must be removed from training data
+    IN
+        df: dataframe
+            if lead = True, must have lead column
+            if lag = True, must have lag column
+        label: column name of label
+        lead: boolean indicating that lead column is a feature
+        lag: boolean indicating that lag column is a feature
+        leadcols: column names of lead features
+        lagcols: column names of lag features
+    OUT
+        dataframe with lead/lag columns if lead/lag are true respectively
+    '''
+    nanfilter = np.ones(len(df)).astype(bool)
+    if lead:
+        for col in leadcols:
+            nanfilter &= ~pd.isnull(df[col])
+    if lag:
+        for col in lagcols:
+            nanfilter &= pd.isnull(df[col])
+
+    X = df.copy()[nanfilter].drop(label, 1)
+    if not lead:
+        X = X.drop(leadcols, 1)
+    if not lag:
+        X = X.drop(lagcols, 1)
+
+    y = df.copy()[nanfilter]['label']
+
+
+def add_neighbors(dfin, colin, colout, size=4):
+    '''
+    IN
+        dfin: input dataframe
+        colin: column name for input data
+        colout: column name of output data
+        size: number of neighbors to consider
+    OUT
+        dataframe with new column added
+    '''
+    pass
 
 
 def clean_df_subset(df, subset, label='waittime'):
