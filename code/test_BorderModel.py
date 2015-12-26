@@ -1,6 +1,6 @@
 import unittest2 as unittest
 from BorderModel import BorderData, clean_df_subset
-from BorderModel import BorderImpute, xy_laglead
+from BorderModel import BorderImpute, xy_laglead, add_leadlag
 from dbhelper import pd_query
 import copy
 from random import randint
@@ -12,6 +12,25 @@ import pdb
 class TestBorderImpute(unittest.TestCase):
     def setUp(self):
         pass
+
+    def test_add_lead_lag(self):
+        # Prepare test data
+        X0 = np.random.randint(low=0, high=10, size=(10, 2))
+        y0 = np.random.randint(low=0, high=100, size=(10))
+        df0 = pd.DataFrame(np.hstack((y0.reshape(len(y0), 1), X0)),
+                           columns=('y', 'waittime', 'volume'))
+
+        # Test
+        df = add_leadlag(df0)
+        # pdb.set_trace()
+        self.assertTrue((pd.isnull(df0.waittime.shift(-1)) |
+                        (df.waittime_lead_1 == df0.waittime.shift(-1))).all())
+        self.assertTrue((pd.isnull(df0.waittime.shift(-2)) |
+                        (df.waittime_lead_2 == df0.waittime.shift(-2))).all())
+        self.assertTrue((pd.isnull(df0.waittime.shift(1)) |
+                        (df.waittime_lag_1 == df0.waittime.shift(1))).all())
+        self.assertTrue((pd.isnull(df0.waittime.shift(2)) |
+                        (df.waittime_lag_2 == df0.waittime.shift(2))).all())
 
     def test_xy_laglead(self):
         # Prepare test data
