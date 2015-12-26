@@ -266,17 +266,16 @@ class BorderImpute(object):
         Run fit for each neighbor model
         '''
         self.model_ll = copy.copy(estimator)
-        self.model_ll.fit(Xy_laglead(self.sourcedf, lag=True, lead=True))
+        self.model_ll.fit(xy_laglead(self.sourcedf, lag=True, lead=True))
 
         self.model_lead = copy.copy(estimator)
-        self.model_lead.fit(Xy_laglead(self.sourcedf, lead=True))
+        self.model_lead.fit(xy_laglead(self.sourcedf, lead=True))
 
         self.model_lag = copy.copy(estimator)
-        self.model_lag.fit(Xy_laglead(self.sourcedf, lag=True))
+        self.model_lag.fit(xy_laglead(self.sourcedf, lag=True))
 
 
-def Xy_laglead(df, label='waittime', lead=False, lag=False,
-               leadcols=['lead'], lagcols=['lag']):
+def xy_laglead(df, leadcols, lagcols, label='waittime', lead=False, lag=False):
     '''
     Prepare data with lag lead columns for modeling
     Note that lag and lead at data boundaries will have NaN values
@@ -288,10 +287,11 @@ def Xy_laglead(df, label='waittime', lead=False, lag=False,
         label: column name of label
         lead: boolean indicating that lead column is a feature
         lag: boolean indicating that lag column is a feature
-        leadcols: column names of lead features
-        lagcols: column names of lag features
+        leadcols: column names of lead features (required)
+        lagcols: column names of lag features (required)
     OUT
-        dataframe with lead/lag columns if lead/lag are true respectively
+        X dataframe with lead/lag columns if lead/lag are true respectively
+        y label series
     '''
     nanfilter = np.ones(len(df)).astype(bool)
     if lead:
@@ -299,7 +299,9 @@ def Xy_laglead(df, label='waittime', lead=False, lag=False,
             nanfilter &= ~pd.isnull(df[col])
     if lag:
         for col in lagcols:
-            nanfilter &= pd.isnull(df[col])
+            nanfilter &= ~pd.isnull(df[col])
+
+    y = df.copy()[nanfilter][label]
 
     X = df.copy()[nanfilter].drop(label, 1)
     if not lead:
@@ -307,7 +309,7 @@ def Xy_laglead(df, label='waittime', lead=False, lag=False,
     if not lag:
         X = X.drop(lagcols, 1)
 
-    y = df.copy()[nanfilter]['label']
+    return X, y
 
 
 def add_neighbors(dfin, colin, colout, size=4):

@@ -1,8 +1,50 @@
 import unittest2 as unittest
 from BorderModel import BorderData, clean_df_subset
+from BorderModel import BorderImpute, xy_laglead
 from dbhelper import pd_query
 import copy
 from random import randint
+import numpy as np
+import pandas as pd
+import pdb
+
+
+class TestBorderImpute(unittest.TestCase):
+    def setUp(self):
+        pass
+
+    def test_xy_laglead(self):
+        # Prepare test data
+        X0 = np.random.randint(low=0, high=10, size=(10, 5))
+        y0 = np.random.randint(low=0, high=100, size=(10))
+        df0 = pd.DataFrame(np.hstack((y0.reshape(len(y0), 1), X0)),
+                           columns=('y', 'data', 'lead2', 'lead1',
+                                    'lag1', 'lag2'))
+        # Simulate NaN values
+        df0.loc[0, 'lead2'] = None
+        df0.loc[1, 'lag2'] = None
+
+        # Test lead only case
+        X, y = xy_laglead(df0, ['lead1', 'lead2'], ['lag1', 'lag2'],
+                          label='y', lead=True)
+        self.assertTrue(np.equal(y.values, np.delete(y0, 0)).all())
+        self.assertTrue(np.equal(X.values,
+                                 np.delete(np.delete(X0, 0, 0), [3, 4], 1)
+                                 ).all())
+
+        # Test lag only case
+        X, y = xy_laglead(df0, ['lead1', 'lead2'], ['lag1', 'lag2'],
+                          label='y', lag=True)
+        self.assertTrue(np.equal(y.values, np.delete(y0, 1)).all())
+        self.assertTrue(np.equal(X.values,
+                                 np.delete(np.delete(X0, 1, 0), [1, 2], 1)
+                                 ).all())
+
+        # Test lead/lag case
+        X, y = xy_laglead(df0, ['lead1', 'lead2'], ['lag1', 'lag2'],
+                          label='y', lead=True, lag=True)
+        self.assertTrue(np.equal(y.values, np.delete(y0, [0, 1])).all())
+        self.assertTrue(np.equal(X.values, np.delete(X0, [0, 1], 0)).all())
 
 
 class TestBorderData(unittest.TestCase):
@@ -29,8 +71,8 @@ class TestBorderData(unittest.TestCase):
                 '''
 
         self.df = pd_query(query)
-
-        self.feature = ['year', 'month', 'dayofmonth', 'week', 'dayofweek', 'minofday']
+        self.feature = ['year', 'month', 'dayofmonth', 'week', 'dayofweek',
+                        'minofday']
         self.label = 'waittime'
 
     def test_normal(self):
