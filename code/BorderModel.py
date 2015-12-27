@@ -368,10 +368,8 @@ class BorderImpute(object):
         targetdf: dataframe of target data with neighbor effects
         predictdf: dataframe with latest predictions
     '''
-    def __init__(self, start, end, label='waittime', threshold=10,
+    def __init__(self, label='waittime', threshold=10,
                  neighborfunc=create_neighbor_features):
-        self.start = start
-        self.end = end
         self.label = label
         self.threshold = threshold
         self.neighborfunc = neighborfunc
@@ -391,8 +389,11 @@ class BorderImpute(object):
                                          feature=self.label)
         self.sourcedf = df.join(df_neighbors)
 
+        # Filter out values above threshold
+        self.sourcedf = self.sourcedf[self.sourcedf.waittime < self.threshold]
+
         if 'date' in df.columns:
-            self.sourcedf.set_index('date')
+            self.sourcedf = self.sourcedf.set_index('date')
 
         return self.sourcedf
 
@@ -454,7 +455,7 @@ class BorderImpute(object):
         self.targetdf = df1.join(df_neighbors)
 
         if 'date' in df.columns:
-            self.targetdf.set_index('date')
+            self.targetdf = self.targetdf.set_index('date')
 
         return self.targetdf
 
@@ -502,18 +503,15 @@ class BorderImpute(object):
         if not lead:
             X_test = X_test.drop('lead', 1)
 
-        # Predict
+        # Predict, with decay scaling for lead or lag only
         if lead and lag:
             yhat = self.model_ll.predict(X_test)
         elif lead:
-            yhat = self.model_lead.predict(X_test)
+            yhat = self.model_lead.predict(X_test) / 2.
         elif lag:
-            yhat = self.model_lag.predict(X_test)
+            yhat = self.model_lag.predict(X_test) / 2.
         else:
             raise RuntimeError('lead or lag must be True')
-
-        # The model does not know that values should not be above threshold
-        yhat = np.clip(yhat, 0, self.threshold)
 
         # Add predictions to predictdf
         self.predictdf.loc[X_test.index, self.label] = yhat
