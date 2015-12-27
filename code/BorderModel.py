@@ -8,6 +8,8 @@ from scipy.optimize import minimize
 from dbhelper import pd_query
 import statsmodels.api as sm
 import copy
+from IPython.html.widgets import FloatProgress
+from IPython.display import display
 
 
 class BorderData(object):
@@ -357,15 +359,21 @@ class BorderImpute(object):
         * lag effects
 
     ATTRIBUTES
-        model_ll
-        model_lead
-        model_lag
-        dfsource: dataframe of source data with neighbor effects
+        model_ll: model with lag/lead effects
+        model_lead: model with lead effects
+        model_lag: model with lag effects
+        label: name of label
+        neighborfunc: function that creates features based on neighbor data
+        sourcedf: dataframe of source data with neighbor effects
+        targetdf: dataframe of target data with neighbor effects
+        predictdf: dataframe with latest predictions
     '''
-    def __init__(self, start, end, label='waittime', neighborfunc=create_neighbor_features):
+    def __init__(self, start, end, label='waittime', threshold=10,
+                 neighborfunc=create_neighbor_features):
         self.start = start
         self.end = end
         self.label = label
+        self.threshold = threshold
         self.neighborfunc = neighborfunc
         pass
 
@@ -378,15 +386,19 @@ class BorderImpute(object):
         OUT
             dataframe of prepared source data
         '''
+        # Add neighbor features
         df_neighbors = self.neighborfunc(create_leadlag(df),
                                          feature=self.label)
+        self.sourcedf = df.join(df_neighbors)
 
-        self.sourcedf = df.join(df_neighbors).set_index('date')
+        if 'date' in df.columns:
+            self.sourcedf.set_index('date')
+
         return self.sourcedf
 
     def build_model(self, estimator):
         '''
-        Run fit for each neighbor model
+        Trains each neighbor model
 
         IN
             estimator: initialized sklearn model
@@ -410,8 +422,12 @@ class BorderImpute(object):
 
     def load_models(self, model_ll, model_lead, model_lag):
         '''
-        Primarily used for testing to rerun predictions without having to
-        retrain models
+        Can be used for to rerun predictions without having to retrain models
+
+        IN
+            model_ll: model with lag/lead effects
+            model_lead: model with lead effects
+            model_lag: model with lag effects
         '''
         self.model_ll = model_ll
         self.model_lead = model_lead
@@ -419,7 +435,8 @@ class BorderImpute(object):
 
     def prepare_target(self, df):
         '''
-        Prepare target data for modeling
+        Prepare target data for modeling.  Assumes that rows with zeros in
+        label are rows that will be predicted.
 
         IN
             df: dataframe with features and label
@@ -427,13 +444,18 @@ class BorderImpute(object):
             dataframe of prepared source data
         '''
         df1 = df.copy()
+        # Set all zero values to null
         df1[self.label] = df1[self.label].apply(lambda x:
                                                 None if x == 0 else x)
 
+        # Add neighbor features
         df_neighbors = self.neighborfunc(create_leadlag(df1),
                                          feature=self.label)
+        self.targetdf = df1.join(df_neighbors)
 
-        self.targetdf = df1.join(df_neighbors).set_index('date')
+        if 'date' in df.columns:
+            self.targetdf.set_index('date')
+
         return self.targetdf
 
     def predict(self):
@@ -442,18 +464,29 @@ class BorderImpute(object):
         On each iteration, predictdf attribute is revised
         '''
         self.predictdf = self.targetdf.copy()
+        dftest = self.predictdf.copy()
+        dftest = dftest[pd.isnull(dftest[self.label])]
 
-        while pd.isnull(self.predictdf[self.label]).sum() > 0:
-            dftest = self.predictdf.copy()
-            dftest = dftest[pd.isnull(dftest[self.label])]
+        # Set up progressbar
+        nullcount = pd.isnull(self.predictdf[self.label]).sum()
+        maxnullcount = nullcount
+        f = FloatProgress(min=0, max=maxnullcount)
+        display(f)
 
-            if dftest[(~pd.isnull(dftest.lead)) &
-                      (~pd.isnull(dftest.lag))].sum() > 0:
-                self.predict_once(dftest, lead=True, lag=True)
-            elif dftest[(~pd.isnull(dftest.lead))].sum() > 0:
-                self.predict_once(dftest, lead=True)
-            elif dftest[(~pd.isnull(dftest.lag))].sum() > 0:
-                self.predict_once(dftest, lag=True)
+        while nullcount > 0:
+            if ((~pd.isnull(dftest.lead)) &
+               (~pd.isnull(dftest.lag))).sum() > 0:
+                dftest = self.predict_once(dftest, lead=True, lag=True)
+
+            if (~pd.isnull(dftest.lead)).sum() > 0:
+                dftest = self.predict_once(dftest, lead=True)
+
+            if (~pd.isnull(dftest.lag)).sum() > 0:
+                dftest = self.predict_once(dftest, lag=True)
+
+            nullcount = pd.isnull(self.predictdf[self.label]).sum()
+            print nullcount
+            f.value = maxnullcount - nullcount
 
     def predict_once(self, df, lead=False, lag=False):
         # Omit null values
@@ -479,11 +512,19 @@ class BorderImpute(object):
         else:
             raise RuntimeError('lead or lag must be True')
 
-        # Align data to feature matrix
-        self.predictdf.loc[X_test.index, self.label] = yhat
-        # self.predictdf = df.copy()
+        # The model does not know that values should not be above threshold
+        yhat = np.clip(yhat, 0, self.threshold)
 
-        return pd.Series(yhat, X_test.index)
+        # Add predictions to predictdf
+        self.predictdf.loc[X_test.index, self.label] = yhat
+
+        # Recalculate lead/lag
+        df_neighbors = self.neighborfunc(create_leadlag(self.predictdf),
+                                         feature=self.label)
+        self.predictdf = self.predictdf.drop(['lag', 'lead'], 1)\
+            .join(df_neighbors)
+
+        return self.predictdf[pd.isnull(self.predictdf[self.label])]
 
 
 def clean_df_subset(df, subset, label='waittime'):
