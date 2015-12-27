@@ -1,6 +1,7 @@
 import unittest2 as unittest
 from BorderModel import BorderData, clean_df_subset
-from BorderModel import BorderImpute, xy_laglead, add_leadlag, add_neighbors
+from BorderModel import BorderImpute, xy_laglead
+from BorderModel import create_neighbor_features, create_leadlag
 from dbhelper import pd_query
 import copy
 from random import randint
@@ -13,11 +14,11 @@ class TestBorderImpute(unittest.TestCase):
     def setUp(self):
         pass
 
-    def test_add_neighbors(self):
+    def test_create_neighbor_features(self):
         df0 = pd.DataFrame(np.array([3, 6, 9, 6, 2, 3, 5, 7, 9, 0]),
                            columns=('data',))
-        df1 = add_leadlag(df0, feature='data')
-        df2 = add_neighbors(df1, feature='data')
+        df1 = create_leadlag(df0, feature='data')
+        df2 = create_neighbor_features(df1, feature='data')
 
         leadres = np.array([6.5, 6.1, 4.1, 3.4, 5, 5.9, 6.11, 5.14, 0, np.nan])
         lagres = np.array([np.nan, 3., 4.71, 6.67, 6.6, 5., 3.9, 3.9, 5.1, 7.])
@@ -27,7 +28,7 @@ class TestBorderImpute(unittest.TestCase):
         self.assertTrue(np.allclose(df2.lag, lagres, rtol=0.01,
                         equal_nan=True))
 
-    def test_add_lead_lag(self):
+    def test_create_lead_lag(self):
         # Prepare test data
         X0 = np.random.randint(low=0, high=10, size=(10, 2))
         y0 = np.random.randint(low=0, high=100, size=(10))
@@ -35,7 +36,7 @@ class TestBorderImpute(unittest.TestCase):
                            columns=('y', 'waittime', 'volume'))
 
         # Test
-        df = add_leadlag(df0)
+        df = create_leadlag(df0)
         # pdb.set_trace()
         self.assertTrue((pd.isnull(df0.waittime.shift(-1)) |
                         (df.waittime_lead_1 == df0.waittime.shift(-1))).all())
@@ -60,25 +61,24 @@ class TestBorderImpute(unittest.TestCase):
         # Test lead only case
         X, y = xy_laglead(df0, ['lead1', 'lead2'], ['lag1', 'lag2'],
                           label='y', lead=True)
-        self.assertTrue(np.equal(y.values, np.delete(y0, 0)).all())
-        self.assertTrue(np.equal(X.values,
-                                 np.delete(np.delete(X0, 0, 0), [3, 4], 1)
-                                 ).all())
+        self.assertTrue(np.array_equal(y.values, np.delete(y0, 0)))
+        self.assertTrue(np.array_equal(X.values,
+                                       np.delete(np.delete(X0, 0, 0),
+                                                 [3, 4], 1)))
 
         # Test lag only case
         X, y = xy_laglead(df0, ['lead1', 'lead2'], ['lag1', 'lag2'],
                           label='y', lag=True)
-        self.assertTrue(np.equal(y.values, np.delete(y0, 1)).all())
-        self.assertTrue(np.equal(X.values,
-                                 np.delete(np.delete(X0, 1, 0), [1, 2], 1)
-                                 ).all())
+        self.assertTrue(np.array_equal(y.values, np.delete(y0, 1)))
+        self.assertTrue(np.array_equal(X.values,
+                                       np.delete(np.delete(X0, 1, 0),
+                                                 [1, 2], 1)))
 
         # Test lead/lag case
         X, y = xy_laglead(df0, ['lead1', 'lead2'], ['lag1', 'lag2'],
                           label='y', lead=True, lag=True)
-        self.assertTrue(np.equal(y.values, np.delete(y0, [0, 1])).all())
-        self.assertTrue(np.equal(X.values, np.delete(X0, [0, 1], 0)).all())
-
+        self.assertTrue(np.array_equal(y.values, np.delete(y0, [0, 1])))
+        self.assertTrue(np.array_equal(X.values, np.delete(X0, [0, 1], 0)))
 
 class TestBorderData(unittest.TestCase):
     def setUp(self):

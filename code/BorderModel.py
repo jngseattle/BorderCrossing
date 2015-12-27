@@ -7,6 +7,7 @@ from sklearn.metrics import r2_score, mean_squared_error, \
 from scipy.optimize import minimize
 from dbhelper import pd_query
 import statsmodels.api as sm
+import copy
 
 
 class BorderData(object):
@@ -221,19 +222,19 @@ class BorderData(object):
 
 
 # Helper functions for BorderImpute
-def add_neighbors(dfin, feature='waittime', lead='lead', lag='lag'):
+def create_neighbor_features(dfin, feature='waittime', lead='lead', lag='lag'):
     '''
     Create lag/lead average values from a target observation
     Average weighted by distance from target observation
 
     IN
-        dfin: input dataframe
+        dfin: input dataframe with individual lead/lag features
         feature: name of base feature for creating lag/lead features
         lead: string for lead feature
         lag: string for lag feature
+    OUT
+        dataframe with aggregate lead/lag features
     '''
-    df = dfin.copy()
-
     # Sort column names
     lead_cols = sorted([val for val in dfin.columns.values
                         if '{0}_{1}'.format(feature, lead) in val])
@@ -245,13 +246,16 @@ def add_neighbors(dfin, feature='waittime', lead='lead', lag='lag'):
     lag_weight = [len(lag_cols) - i for i in range(len(lag_cols))]
 
     # Calculate weighted average, ignoring nulls
-    df[lead] = (df[lead_cols] * lead_weight).sum(1) / (~pd.isnull(df[lead_cols]) * lead_weight).sum(1)
-    df[lag] = (df[lag_cols] * lag_weight).sum(1) / (~pd.isnull(df[lag_cols]) * lag_weight).sum(1)
+    df = pd.DataFrame()
+    df[lead] = (dfin[lead_cols] * lead_weight).sum(1) /\
+               (~pd.isnull(dfin[lead_cols]) * lead_weight).sum(1)
+    df[lag] = (dfin[lag_cols] * lag_weight).sum(1) /\
+              (~pd.isnull(dfin[lag_cols]) * lag_weight).sum(1)
 
     return df
 
 
-def add_leadlag(dfin, feature='waittime', lead='lead', lag='lag', size=4):
+def create_leadlag(dfin, feature='waittime', lead='lead', lag='lag', size=4):
     '''
     Create lag/lead features from a target observation
 
@@ -327,9 +331,10 @@ class BorderImpute(object):
         model_lag
         dfsource: dataframe of source data with neighbor effects
     '''
-    def __init__(self, start, end, neighborfunc=add_neighbors):
+    def __init__(self, start, end, neighborfunc=create_neighbor_features):
         self.start = start
         self.end = end
+        self.neighborfunc = neighborfunc
         pass
 
     def prepare_source(self, query):
@@ -349,26 +354,26 @@ class BorderImpute(object):
         # Get data from DB
         df = pd_query(query)
 
-        # Get lead feature as series
-        # Get lag feature as series
-        # Combine in dataframe, excluding NaN
-        pass
+        df_neighbors = self.neighborfunc(create_leadlag(df))
+
+        self.sourcedf = df.join(df_neighbors).set_index('date')
+        return self.sourcedf
 
     def build_model(self, estimator):
         '''
         Run fit for each neighbor model
         '''
+        X, y = xy_laglead(self.sourcedf, ['lead'], ['lag'], lag=True, lead=True)
         self.model_ll = copy.copy(estimator)
-        self.model_ll.fit(xy_laglead(self.sourcedf, ['lead'], ['lag'],
-                                     lag=True, lead=True))
+        self.model_ll.fit(X, y)
 
+        X, y = xy_laglead(self.sourcedf, ['lead'], ['lag'], lead=True)
         self.model_lead = copy.copy(estimator)
-        self.model_lead.fit(xy_laglead(self.sourcedf, ['lead'], ['lag'],
-                                       lead=True))
+        self.model_lead.fit(X, y)
 
+        X, y = xy_laglead(self.sourcedf, ['lead'], ['lag'], lag=True)
         self.model_lag = copy.copy(estimator)
-        self.model_lag.fit(xy_laglead(self.sourcedf, ['lead'], ['lag'],
-                                      lag=True))
+        self.model_lag.fit(X, y)
 
 
 def clean_df_subset(df, subset, label='waittime'):
