@@ -80,6 +80,7 @@ class TestBorderImpute(unittest.TestCase):
         self.assertTrue(np.array_equal(y.values, np.delete(y0, [0, 1])))
         self.assertTrue(np.array_equal(X.values, np.delete(X0, [0, 1], 0)))
 
+
 class TestBorderData(unittest.TestCase):
     def setUp(self):
         query = '''

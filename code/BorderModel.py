@@ -315,6 +315,39 @@ def xy_laglead(df, leadcols, lagcols, label='waittime', lead=False, lag=False):
     return X, y
 
 
+def emulate_testdata(df, label='waittime', threshold=10, proportion=.85):
+    '''
+    Set label value to zero for values below threshold
+    Algorithm for setting to zero includes some randomness to prevent a
+    hard boundary at threshold
+
+    IN
+        dataframe with matching columns as source data
+        label: name of lable column
+        threshold
+        proportion: percentage of values under threshold to set to zero
+    OUT
+        dataframe of modified label values aligned with df
+        with columns date & *label*_new
+    '''
+    # Build non-linear weighting for values below threshold
+    weight = threshold - df[label].clip(upper=threshold)
+    weight = weight ** 2
+
+    # Select values to set to zero
+    dfzero = df.sample(n=int(proportion * sum(weight > 0)), weights=weight)
+
+    # Set sample values to zero, aligned with original dataframe
+    modvalues = df.copy()[label]
+    modvalues[df.isin(dfzero).date.values] = 0
+
+    # Construct dataframe with date and new label name
+    dfout = df.copy()
+    dfout[label] = modvalues
+
+    return dfout
+
+
 class BorderImpute(object):
     '''
     Class for imputing data using neighbor values as features
@@ -322,8 +355,6 @@ class BorderImpute(object):
         * lead + lag effects
         * lead effects
         * lag effects
-    Assumes all models will include volume and date features
-    Date features can be overridden
 
     ATTRIBUTES
         model_ll
@@ -331,30 +362,24 @@ class BorderImpute(object):
         model_lag
         dfsource: dataframe of source data with neighbor effects
     '''
-    def __init__(self, start, end, neighborfunc=create_neighbor_features):
+    def __init__(self, start, end, label='waittime', neighborfunc=create_neighbor_features):
         self.start = start
         self.end = end
+        self.label = label
         self.neighborfunc = neighborfunc
         pass
 
-    def prepare_source(self, query):
+    def prepare_source(self, df):
         '''
-        Select data and prepare for modeling
-        * Raw wait time
-        * Smoothed volume
-        * Date features
-        Add neighbor data
+        Prepare source data for modeling
 
         IN
-            munger_id
-            crossing_id
+            df: dataframe with features and label
         OUT
             dataframe of prepared source data
         '''
-        # Get data from DB
-        df = pd_query(query)
-
-        df_neighbors = self.neighborfunc(create_leadlag(df))
+        df_neighbors = self.neighborfunc(create_leadlag(df),
+                                         feature=self.label)
 
         self.sourcedf = df.join(df_neighbors).set_index('date')
         return self.sourcedf
@@ -362,18 +387,103 @@ class BorderImpute(object):
     def build_model(self, estimator):
         '''
         Run fit for each neighbor model
+
+        IN
+            estimator: initialized sklearn model
+        OUT
+            None
         '''
-        X, y = xy_laglead(self.sourcedf, ['lead'], ['lag'], lag=True, lead=True)
+        X, y = xy_laglead(self.sourcedf, ['lead'], ['lag'], lag=True,
+                          lead=True, label=self.label)
         self.model_ll = copy.copy(estimator)
         self.model_ll.fit(X, y)
 
-        X, y = xy_laglead(self.sourcedf, ['lead'], ['lag'], lead=True)
+        X, y = xy_laglead(self.sourcedf, ['lead'], ['lag'], lead=True,
+                          label=self.label)
         self.model_lead = copy.copy(estimator)
         self.model_lead.fit(X, y)
 
-        X, y = xy_laglead(self.sourcedf, ['lead'], ['lag'], lag=True)
+        X, y = xy_laglead(self.sourcedf, ['lead'], ['lag'], lag=True,
+                          label=self.label)
         self.model_lag = copy.copy(estimator)
         self.model_lag.fit(X, y)
+
+    def load_models(self, model_ll, model_lead, model_lag):
+        '''
+        Primarily used for testing to rerun predictions without having to
+        retrain models
+        '''
+        self.model_ll = model_ll
+        self.model_lead = model_lead
+        self.model_lag = model_lag
+
+    def prepare_target(self, df):
+        '''
+        Prepare target data for modeling
+
+        IN
+            df: dataframe with features and label
+        OUT
+            dataframe of prepared source data
+        '''
+        df1 = df.copy()
+        df1[self.label] = df1[self.label].apply(lambda x:
+                                                None if x == 0 else x)
+
+        df_neighbors = self.neighborfunc(create_leadlag(df1),
+                                         feature=self.label)
+
+        self.targetdf = df1.join(df_neighbors).set_index('date')
+        return self.targetdf
+
+    def predict(self):
+        '''
+        Iteratively predict values based on available neighbor data
+        On each iteration, predictdf attribute is revised
+        '''
+        self.predictdf = self.targetdf.copy()
+
+        while pd.isnull(self.predictdf[self.label]).sum() > 0:
+            dftest = self.predictdf.copy()
+            dftest = dftest[pd.isnull(dftest[self.label])]
+
+            if dftest[(~pd.isnull(dftest.lead)) &
+                      (~pd.isnull(dftest.lag))].sum() > 0:
+                self.predict_once(dftest, lead=True, lag=True)
+            elif dftest[(~pd.isnull(dftest.lead))].sum() > 0:
+                self.predict_once(dftest, lead=True)
+            elif dftest[(~pd.isnull(dftest.lag))].sum() > 0:
+                self.predict_once(dftest, lag=True)
+
+    def predict_once(self, df, lead=False, lag=False):
+        # Omit null values
+        if lead:
+            df = df[~pd.isnull(df.lead)]
+        if lag:
+            df = df[~pd.isnull(df.lag)]
+
+        # Prepare feature matrix
+        X_test = df.drop(self.label, 1)
+        if not lag:
+            X_test = X_test.drop('lag', 1)
+        if not lead:
+            X_test = X_test.drop('lead', 1)
+
+        # Predict
+        if lead and lag:
+            yhat = self.model_ll.predict(X_test)
+        elif lead:
+            yhat = self.model_lead.predict(X_test)
+        elif lag:
+            yhat = self.model_lag.predict(X_test)
+        else:
+            raise RuntimeError('lead or lag must be True')
+
+        # Align data to feature matrix
+        self.predictdf.loc[X_test.index, self.label] = yhat
+        # self.predictdf = df.copy()
+
+        return pd.Series(yhat, X_test.index)
 
 
 def clean_df_subset(df, subset, label='waittime'):
