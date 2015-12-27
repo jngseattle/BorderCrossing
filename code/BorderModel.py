@@ -221,22 +221,45 @@ class BorderData(object):
 
 
 # Helper functions for BorderImpute
-def add_neighbors(dfin, feature='waittime'):
+def add_neighbors(dfin, feature='waittime', lead='lead', lag='lag'):
     '''
     Create lag/lead average values from a target observation
     Average weighted by distance from target observation
+
+    IN
+        dfin: input dataframe
+        feature: name of base feature for creating lag/lead features
+        lead: string for lead feature
+        lag: string for lag feature
     '''
-    pass
+    df = dfin.copy()
+
+    # Sort column names
+    lead_cols = sorted([val for val in dfin.columns.values
+                        if '{0}_{1}'.format(feature, lead) in val])
+    lag_cols = sorted([val for val in dfin.columns.values
+                       if '{0}_{1}'.format(feature, lag) in val])
+
+    # Simple linear decay
+    lead_weight = [len(lead_cols) - i for i in range(len(lead_cols))]
+    lag_weight = [len(lag_cols) - i for i in range(len(lag_cols))]
+
+    # Calculate weighted average, ignoring nulls
+    df[lead] = (df[lead_cols] * lead_weight).sum(1) / (~pd.isnull(df[lead_cols]) * lead_weight).sum(1)
+    df[lag] = (df[lag_cols] * lag_weight).sum(1) / (~pd.isnull(df[lag_cols]) * lag_weight).sum(1)
+
+    return df
 
 
-def add_leadlag(dfin, feature='waittime', size=4):
+def add_leadlag(dfin, feature='waittime', lead='lead', lag='lag', size=4):
     '''
     Create lag/lead features from a target observation
 
     IN
         dfin: input dataframe
-        colin: column name for input data
-        colout: column name of output data
+        feature: name of base feature for creating lag/lead features
+        lead: string for lead feature
+        lag: string for lag feature
         size: number of neighbors to consider
     OUT
         dataframe with only lead/lag columns aligned to dfin
@@ -244,8 +267,8 @@ def add_leadlag(dfin, feature='waittime', size=4):
     df = pd.DataFrame()
 
     for i in range(1, size + 1):
-        df['{0}_lead_{1}'.format(feature, i)] = dfin[feature].shift(-i)
-        df['{0}_lag_{1}'.format(feature, i)] = dfin[feature].shift(i)
+        df['{0}_{1}_{2}'.format(feature, lead, i)] = dfin[feature].shift(-i)
+        df['{0}_{1}_{2}'.format(feature, lag, i)] = dfin[feature].shift(i)
 
     return df
 
