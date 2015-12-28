@@ -177,8 +177,8 @@ class MyDB:
 
 class PgDB:
     def __enter__(self):
-        self.conn = psycopg2.connect(
-            "dbname=border user={0}".format(os.getenv('POSTGRESQL_USER')))
+        self.conn = psycopg2.connect(database='border',
+                                     user=os.getenv('POSTGRESQL_USER'))
         self.cur = self.conn.cursor()
         return self
 

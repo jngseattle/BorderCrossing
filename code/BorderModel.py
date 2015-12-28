@@ -8,7 +8,7 @@ from scipy.optimize import minimize
 from dbhelper import pd_query
 import statsmodels.api as sm
 import copy
-from IPython.html.widgets import FloatProgress
+from ipywidgets import FloatProgress
 from IPython.display import display
 
 
