@@ -1,4 +1,3 @@
-import mysql.connector
 import psycopg2
 import os
 import datetime
