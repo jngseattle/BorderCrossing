@@ -29,7 +29,7 @@ class BorderData(object):
             baseline: series for last years data averaged by day of week
             yhat: series of predicted values
     '''
-    def __init__(self, df, years=3, label='waittime'):
+    def __init__(self, df, years=3, label='waittime', categoricals=None):
         '''
         IN
             df: dataframe with date, features and label
@@ -39,10 +39,17 @@ class BorderData(object):
         self.df = df.copy()
         self.date = df['date']
 
-        # Handle event categoricals
-        events = self._event_dummies(df.copy())
+        # Handle categoricals
+        if categoricals is not None:
+            for cat in categoricals:
+                # Remove categoricals from self.df
+                for col in self.df.columns:
+                    if cat in col:
+                        self.df = self.df.drop(col, 1)
+                # Add dummified categoricals
+                self.df = self.df.join(self._dummies(df.copy(), cat))
 
-        self.X = df.drop('date', axis=1)
+        self.X = self.df.drop('date', axis=1)
 
         # Remove labels from X
         for l in ['waittime', 'volume', label]:
@@ -62,8 +69,8 @@ class BorderData(object):
         self._prepare_train_test()
         self.baseline = self.baseline_model(label=self.label)['baseline']
 
-    def _event_dummies(self, df):
-        cols = [c for c in df.columns.values if 'event' in c]
+    def _dummies(self, df, categorical):
+        cols = [c for c in df.columns.values if categorical in c]
         return create_dummies(df, cols)
 
     def _prepare_train_test(self):
