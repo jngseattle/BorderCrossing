@@ -612,7 +612,7 @@ def _mse(weights, target, predict):
     return mean_squared_error(target, harmonic_mean(predict, weights))
 
 
-def model_years(df, model, start, end):
+def model_years(df, model, start, end, categoricals=None):
     '''
     Run model over years from start to end
 
@@ -626,7 +626,7 @@ def model_years(df, model, start, end):
     for year in range(start, end + 1):
         dfin = df.copy()[df.date < datetime.date(year + 1, 1, 1)]
         print "Training... ", year
-        data = BorderData(dfin)
+        data = BorderData(dfin, categoricals=categoricals)
 
         params = {}
         grid = GridSearchCV(model, params, cv=data.cv_train)
