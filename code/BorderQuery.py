@@ -1,7 +1,7 @@
 from dbhelper import pd_query, PgDB
 
 
-def query_mungedata(munger_id, crossing_id, start_date):
+def select_mungedata(munger_id, crossing_id, start_date):
     query = '''
             select
                 m.date,
@@ -162,7 +162,7 @@ def query_mungedata(munger_id, crossing_id, start_date):
     return pd_query(query.format(crossing_id, munger_id, start_date))
 
 
-def query_features(start_date, end_date):
+def select_features(start_date, end_date):
     query = '''
             select
                 d.date,
