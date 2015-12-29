@@ -40,15 +40,9 @@ class BorderData(object):
         self.df = df.copy()
         self.date = df['date']
 
-        # Handle categoricals
+        # One hot encoding of categoricals
         if categoricals is not None:
-            for cat in categoricals:
-                # Remove categoricals from self.df
-                for col in self.df.columns:
-                    if cat in col:
-                        self.df = self.df.drop(col, 1)
-                # Add dummified categoricals
-                self.df = self.df.join(self._dummies(df.copy(), cat))
+            self.df = handle_categoricals(self.df, categoricals)
 
         self.X = self.df.drop('date', axis=1)
 
@@ -69,10 +63,6 @@ class BorderData(object):
         self.test_indices = self.cv[-1][1]
         self._prepare_train_test()
         self.baseline = self.baseline_model(label=self.label)['baseline']
-
-    def _dummies(self, df, categorical):
-        cols = [c for c in df.columns.values if categorical in c]
-        return create_dummies(df, cols)
 
     def _prepare_train_test(self):
         '''
@@ -600,6 +590,31 @@ def create_dummies(df, cols, drop=False):
     newdf = newdf.drop('i', axis=1)
 
     return newdf
+
+
+def handle_categoricals(df, suffix):
+    '''
+    One hot encoding of features with matching suffix
+
+    IN
+        df: dataframe
+        suffix: string suffix of feature name
+    OUT
+        dataframe with original feature removed and encoded features added
+    '''
+    # TODO: match beginning of label name
+    df1 = df.copy()
+
+    for cat in suffix:
+        # Remove categoricals from df
+        for col in df1.columns:
+            if cat in col:
+                df1 = df1.drop(col, 1)
+
+        cols = [c for c in df.columns.values if cat in c]
+        df1 = df1.join(create_dummies(df, cols))
+
+    return df1
 
 
 def harmonic_mean(data, weights):

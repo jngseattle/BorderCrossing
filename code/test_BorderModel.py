@@ -1,5 +1,5 @@
 import unittest2 as unittest
-from BorderModel import BorderData, clean_df_subset
+from BorderModel import BorderData, clean_df_subset, handle_categoricals
 from BorderModel import BorderImpute, xy_laglead
 from BorderModel import create_neighbor_features, create_leadlag
 from dbhelper import pd_query
@@ -220,6 +220,23 @@ class TestBorderData(unittest.TestCase):
                          data.df[data.df.year == 2015].index.max())
         self.assertEqual(len(data.cv[-1, -1]),
                          data.df[data.df.year == 2015].waittime.count())
+
+    def test_handle_categoricals(self):
+        events = np.array([['mlk', None, 3], [None, 'newyears', 2]])
+        df = pd.DataFrame(events, columns=['event', 'event_lag', 'delay'])
+        dfout = handle_categoricals(df, ['event'])
+
+        self.assertTrue(np.array_equal(dfout.columns.values,
+                                       np.array(['delay',
+                                                 'event_mlk',
+                                                 'event_lag_newyears'])))
+        self.assertTrue(np.array_equal(dfout.event_mlk.values,
+                                       np.array([1, 0])))
+        self.assertTrue(np.array_equal(dfout.event_lag_newyears.values,
+                                       np.array([0, 1])))
+        self.assertTrue(np.array_equal(dfout.delay.values,
+                                       np.array([3, 2])))
+
 
 if __name__ == '__main__':
     unittest.main()
