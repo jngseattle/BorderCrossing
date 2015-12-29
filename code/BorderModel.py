@@ -145,8 +145,8 @@ class BorderData(object):
 
     def calculate_weights(self, model):
         '''
-        Calculate weights for predictions based on feature importance
-        Apply higher weight to dates for events with high feature importance
+        Calculate weights for predictions based on feature_importances_
+        Includes spreading function
 
         [DO NOT USE: Does not perform as well as scalar weightings]
 
@@ -159,15 +159,15 @@ class BorderData(object):
         # Below threshold value, set weight to 1
         weight = np.log(model.feature_importances_)
         weight = [x + 9 if x > -6 else 1 for x in weight]
+        # weight = 2
 
         # Non-event columns to exclude from weighting
         # But do not delete columns until after multiply to keep arrays aligned
         exclude = [i for i, x in enumerate(self.X.columns.values)
                    if 'event' not in x]
 
-        # Multiply columnwise, drop non-event columns
-        # Sum for observation weights
-        return np.array(np.delete((self.X_test * weight), exclude, 1).sum(1))
+        events = np.array(np.delete((self.X_test * weight), exclude, 1).sum(1))
+        return (np.convolve(events, [1, 2, 3, 3, 3, 2, 1]) + 1)[:len(events)]
 
     def _df_last(self):
         '''
