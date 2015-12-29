@@ -633,8 +633,10 @@ def model_years(df, model, start, end, categoricals=None):
         grid.fit(data.X_train, data.y_train)
 
         data.predict(grid)
+        data.predict_ensemble()
         print "Baseline : ", r2_score(data.y_test, data.baseline)
         print 'Model    : ', r2_score(data.y_test, data.yhat)
+        print "Ensemble : ", r2_score(data.y_test, data.ensemble)
 
         trained[year] = (data, grid)
 
