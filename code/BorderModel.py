@@ -637,8 +637,12 @@ def optimize_scalar_weights(target, predict, predict_weight=None):
     OUT
         list of weights
     '''
-    res = minimize(_mse, [1, 1], args=(target, predict, predict_weight))
-    return res.x
+    try:
+        res = minimize(_mse, [1, 1], args=(target, predict, predict_weight))
+        return res.x
+    except ValueError:
+        print 'minimize unexplained ValueError.  Returning default weights'
+        return [1, 1]
 
 
 def _mse(weights, target, predict, predict_weight):
@@ -686,6 +690,7 @@ def model_years(df, model, start, end, categoricals=None):
         trained[year] = (data, grid)
 
     return trained
+
 
 def smooth(munger_id, crossing_id, field, limit=None, path='../data'):
     '''
