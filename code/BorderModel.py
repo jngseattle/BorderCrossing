@@ -134,15 +134,40 @@ class BorderData(object):
             self.predict(model)
 
         if self.yhat is not None:
-            wy, wb = calculate_weights(self.y_test, (self.yhat, self.baseline))
+            # predict_weight = self.calculate_weights(model)
+            predict_weight = None
+            wy, wb = optimize_scalar_weights(self.y_test,
+                                             (self.yhat, self.baseline),
+                                             predict_weight=predict_weight)
+
             self.ensemble = harmonic_mean((self.yhat, self.baseline), (wy, wb))
             self.weights = (wy, wb)
 
-    def calculate_weights():
+    def calculate_weights(self, model):
         '''
+        Calculate weights for predictions based on feature importance
         Apply higher weight to dates for events with high feature importance
+
+        [DO NOT USE: Does not perform as well as scalar weightings]
+
+        IN
+            model: trained sklearn model with feature_importances_
+        OUT
+            array of observation weights
         '''
-        pass
+        # Set feature weights based on log feature importances
+        # Below threshold value, set weight to 1
+        weight = np.log(model.feature_importances_)
+        weight = [x + 9 if x > -6 else 1 for x in weight]
+
+        # Non-event columns to exclude from weighting
+        # But do not delete columns until after multiply to keep arrays aligned
+        exclude = [i for i, x in enumerate(self.X.columns.values)
+                   if 'event' not in x]
+
+        # Multiply columnwise, drop non-event columns
+        # Sum for observation weights
+        return np.array(np.delete((self.X_test * weight), exclude, 1).sum(1))
 
     def _df_last(self):
         '''
@@ -589,7 +614,7 @@ def harmonic_mean(data, weights):
     return sum(weights) / denom
 
 
-def calculate_weights(target, predict):
+def optimize_scalar_weights(target, predict, predict_weight=None):
     '''
     IN
         target: actual values
@@ -597,11 +622,11 @@ def calculate_weights(target, predict):
     OUT
         list of weights
     '''
-    res = minimize(_mse, [2, 1], args=(target, predict))
+    res = minimize(_mse, [1, 1], args=(target, predict, predict_weight))
     return res.x
 
 
-def _mse(weights, target, predict):
+def _mse(weights, target, predict, predict_weight):
     '''
     IN
         target: actual values
@@ -609,7 +634,12 @@ def _mse(weights, target, predict):
     OUT
         MSE
     '''
-    return mean_squared_error(target, harmonic_mean(predict, weights))
+    # pdb.set_trace()
+    wy, wb = weights
+    if predict_weight is not None:
+        wb = wb * predict_weight
+
+    return mean_squared_error(target, harmonic_mean(predict, (wy, wb)))
 
 
 def model_years(df, model, start, end, categoricals=None):
