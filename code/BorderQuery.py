@@ -325,7 +325,7 @@ def insert_predictions(model_id, munger_id, crossing_id, dates, waittime):
     query = '''
             insert into predictions
             (model_version, munger_id, crossing_id, date, waittime)
-            values('{0}', {1}, {2}, {3}, {4})
+            values('{0}', {1}, {2}, '{3}', {4})
             '''
 
     with PgDB() as db:
