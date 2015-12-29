@@ -4,6 +4,7 @@ import datetime
 import pdb
 from sklearn.metrics import r2_score, mean_squared_error, \
     explained_variance_score
+from sklearn.grid_search import GridSearchCV
 from scipy.optimize import minimize
 from dbhelper import pd_query
 import statsmodels.api as sm
@@ -136,6 +137,12 @@ class BorderData(object):
             wy, wb = calculate_weights(self.y_test, (self.yhat, self.baseline))
             self.ensemble = harmonic_mean((self.yhat, self.baseline), (wy, wb))
             self.weights = (wy, wb)
+
+    def calculate_weights():
+        '''
+        Apply higher weight to dates for events with high feature importance
+        '''
+        pass
 
     def _df_last(self):
         '''
@@ -604,6 +611,34 @@ def _mse(weights, target, predict):
     '''
     return mean_squared_error(target, harmonic_mean(predict, weights))
 
+
+def model_years(df, model, start, end):
+    '''
+    Run model over years from start to end
+
+    IN
+        df: dataframe with features and label
+        model: initialized sklearn model
+        start: int, start year
+        end: int, end year
+    '''
+    trained = {}
+    for year in range(start, end + 1):
+        dfin = df.copy()[df.date < datetime.date(year + 1, 1, 1)]
+        print "Training... ", year
+        data = BorderData(dfin)
+
+        params = {}
+        grid = GridSearchCV(model, params, cv=data.cv_train)
+        grid.fit(data.X_train, data.y_train)
+
+        data.predict(grid)
+        print "Baseline : ", r2_score(data.y_test, data.baseline)
+        print 'Model    : ', r2_score(data.y_test, data.yhat)
+
+        trained[year] = (data, grid)
+
+    return trained
 
 def smooth(munger_id, crossing_id, field, limit=None, path='../data'):
     '''
