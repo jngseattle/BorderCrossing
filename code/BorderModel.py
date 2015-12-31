@@ -13,6 +13,114 @@ from ipywidgets import FloatProgress
 from IPython.display import display
 
 
+def label_averages(series, periods=48):
+    '''
+    Builds rolling averages and lag averages from a series
+    IN
+        series: series of label data with time as index
+                assumes no gaps in times series
+        periods: periods in one day
+    OUT
+        dataframe with rolling averages and lag averages
+    '''
+    df = pd.DataFrame(series)
+
+    # Calulate rolling averages
+    for days in [7, 14, 21, 28, 366]:
+        df['avg_roll_{0}'.format(day)] = \
+            pd.rolling_mean(series, days * periods,
+                            min_periods=days * periods / 2)
+
+
+class IncrementalModel(object):
+    '''
+    ATTRIBUTES
+        df: training dataframe with features
+            assume - waittime is label
+        X_test: test feature matrix
+            assume - same grain as training data
+        categoricals: list of categorical prefixes
+        sampling: sample period as offset alias, (default: 30 mins)
+        model: initialized sklearn regressor
+    '''
+    def __init__(self, df, X_test, model, categoricals=None, sampling='30min',
+                 averager=label_averages):
+        self.model = model
+
+        # Prepare training data
+        # Resample to remove gaps, inserting NA's
+        # Averager needs time series without gaps
+        self.df = df.resample(sampling)
+        if 'date' in self.df.columns:
+            self.df.set_index('date', 1)
+
+        # Prepare test data
+        # X_test should be properly sampled, but resample to be safe
+        self.X_test = X_test.resample(sampling)
+        if 'date' in self.X_test.columns:
+            self.X_test.set_index('date', 1)
+
+        # Add categoricals
+        self.categoricals = categoricals
+        if self.categoricals is not None:
+            self.df = handle_categoricals(self.df, self.categoricals)
+            self.X_test = handle_categoricals(self.X_test, self.categoricals)
+
+        # Add rolling averages and lag averages to training data
+        # Remove nulls introduced by resampling and averager
+        self.df = self.df.join(self.averager(self.y))
+        self.df.dropna()
+
+        # Prepare X, y training data
+        self.y = self.df.waittime
+        self.X = self.df.drop('waittime', 1)
+
+        # Add rolling averages and lag averages to first day of test data
+        # Verify that there is training data for day before
+        # first day of test data
+        day_before = self.X_test.index[0] - datetime.timedelta(days=1)
+        if sum(self.y.index.date == day_before) > 0:
+            # Calculate averages from training data
+            # and shift time to match first day of test data
+            averages = self.averager(self.y[self.y.index.date == day_before])
+            averages.index = averages.index.date + datetime.timedelta(days=1)
+
+            self.X_test = self.X_test.join(averages)
+        else:
+            raise ValueError('There must be training data available for day\
+                              before first day of X_test')
+
+        # Fit the model
+        self.model.fit(self.X, self.y)
+
+    def predict(self):
+        Xt = self.X_test
+        predict = pd.Series()
+
+        # Filter first day of test data
+        dt = Xt.index[0]
+        Xt_1 = Xt[Xt.index.date == dt]
+
+        while len(Xt_1) > 0:
+            # Predict for 1 day
+            predict_1 = self.predict(Xt_1)
+            predict = predict.append(predict_1)
+
+            # Check if there are any more days to predict
+            dt += datetime.timedelta(days=1)
+            if sum(Xt.index.date == dt) == 0:
+                break
+
+            # Add new rolling/lag averages to next day in X_test
+            averages = self.averager(predict_1)
+            Xt = Xt.loc[Xt.index.date == dt, averages.columns] = averages
+
+            # Increment test data by day
+            Xt_1 = Xt[Xt.index.date == dt]
+
+        return predict
+
+
 class BorderData(object):
     '''
         ATTRIBUTES

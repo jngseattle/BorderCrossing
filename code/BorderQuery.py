@@ -162,6 +162,56 @@ def select_mungedata(munger_id, crossing_id, start_date):
     return pd_query(query.format(crossing_id, munger_id, start_date))
 
 
+def select_mungedata_simple(munger_id, crossing_id, start_date):
+    '''
+    Select data with date features only
+    '''
+    query = '''
+            select
+                m.date,
+                metric as waittime,
+                year,
+                month,
+                week,
+                dayofweek,
+                minofday,
+            from mungedata m
+            join datefeatures d on m.date = d.date
+        where
+            crossing_id = {0}
+            and munger_id = {1}
+            and (minute = 0 or minute = 30)
+            and is_waittime = true
+            and m.date >= '{2}'
+        order by m.date;
+        '''
+
+    return pd_query(query.format(crossing_id, munger_id, start_date))
+
+
+def select_crossingdata(crossing_id, start_date):
+    query = '''
+            select
+                c.date,
+                waittime,
+                volume,
+                year,
+                month,
+                week,
+                dayofweek,
+                minofday
+            from crossingdata c
+            join datefeatures d on c.date = d.date
+        where
+            crossing_id = {0}
+            and (minute = 0 or minute = 30)
+            and c.date >= '{1}'
+        order by c.date;
+        '''
+
+    return pd_query(query.format(crossing_id, start_date))
+
+
 def select_features(start_date, end_date):
     query = '''
             select
@@ -309,6 +359,28 @@ def select_features(start_date, end_date):
             left join schoolcalendar van_lead3 on d.date::timestamp::date =
                 van_lead3.date_out - interval '3 day'
                 and van_lead3.district='vancouver'
+        where
+            d.date >= '{0}' and d.date < '{1}'
+            and (minute = 0 or minute = 30)
+        order by d.date;
+        '''
+
+    return pd_query(query.format(start_date, end_date)).set_index('date')
+
+
+def select_features_simple(start_date, end_date):
+    '''
+    Select date features only
+    '''
+    query = '''
+            select
+                d.date,
+                year,
+                month,
+                week,
+                dayofweek,
+                minofday,
+            from datefeatures d
         where
             d.date >= '{0}' and d.date < '{1}'
             and (minute = 0 or minute = 30)
