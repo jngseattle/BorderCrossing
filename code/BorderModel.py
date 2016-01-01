@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import datetime
+import datetime as dt
 import pdb
 from sklearn.metrics import r2_score, mean_squared_error, \
     explained_variance_score
@@ -13,23 +13,62 @@ from ipywidgets import FloatProgress
 from IPython.display import display
 
 
-def label_averages(series, periods=48):
+def label_averages(series, upsample='30min', percent_nonnull=.9):
     '''
-    Builds rolling averages and lag averages from a series
+    Builds rolling averages and lag averages from a series; grain of 1 day
+
     IN
         series: series of label data with time as index
                 assumes no gaps in times series
-        periods: periods in one day
+        upsample: sampling for output
+        percent_nonnull: minimum percent of observations that each averaging
+                         window must have to return a non-null average value
     OUT
-        dataframe with rolling averages and lag averages
+        dataframe with average features
+            index shifted shifted forward 1 day from input series
     '''
-    df = pd.DataFrame(series)
+    # Create a series of averages by day
+    daily = series.resample('D', how='mean')
 
-    # Calulate rolling averages
+    df = pd.DataFrame()
+
+    # Calculate rolling averages
     for days in [7, 14, 21, 28, 366]:
-        df['avg_roll_{0}'.format(day)] = \
-            pd.rolling_mean(series, days * periods,
-                            min_periods=days * periods / 2)
+        df['avg_roll_{0}'.format(days)] = \
+            pd.rolling_mean(daily, days, min_periods=days * percent_nonnull)
+
+    # Add lag averages
+    for days in range(1, 8):
+        df['avg_lag_{0}'.format(days)] = daily.shift(days)
+
+    # Upsample to match original data
+    # Resample ends at last index value, so df is extended by one day
+    # to fill averages for times during last day
+    ix = pd.DatetimeIndex(start=df.index[0].date(),
+                          end=df.index[-1].date() + dt.timedelta(1), freq='D')
+    df = df.reindex(ix).resample(upsample, fill_method='pad')
+
+    # Shift forward to next day since averages are used as lag features
+    df.index = df.index + dt.timedelta(1)
+
+    return df
+
+
+def lag_features(series, period=48):
+    '''
+    IN
+        series
+        period: number of periods in 1 day
+    OUT
+        dataframe of lag features with same index as input series
+    '''
+    df = pd.DataFrame()
+
+    # Calculate lag features
+    for days in [1, 2, 3, 4, 5, 6, 7, 14, 21, 28]:
+        df['lag_{0}'.format(days)] = series.shift(days * period)
+
+    return df
 
 
 class IncrementalModel(object):
@@ -43,80 +82,73 @@ class IncrementalModel(object):
         sampling: sample period as offset alias, (default: 30 mins)
         model: initialized sklearn regressor
     '''
-    def __init__(self, df, X_test, model, categoricals=None, sampling='30min',
+    def __init__(self, df, model, categoricals=None, sampling='30min',
                  averager=label_averages):
         self.model = model
+        self.averager = label_averages
+        self.sampling = sampling
 
         # Prepare training data
         # Resample to remove gaps, inserting NA's
         # Averager needs time series without gaps
-        self.df = df.resample(sampling)
-        if 'date' in self.df.columns:
-            self.df.set_index('date', 1)
-
-        # Prepare test data
-        # X_test should be properly sampled, but resample to be safe
-        self.X_test = X_test.resample(sampling)
-        if 'date' in self.X_test.columns:
-            self.X_test.set_index('date', 1)
+        self.df = df.copy()
+        if 'date' in self.df:
+            self.df = self.df.set_index('date')
+        self.df = self.df.resample(self.sampling)
 
         # Add categoricals
         self.categoricals = categoricals
         if self.categoricals is not None:
             self.df = handle_categoricals(self.df, self.categoricals)
-            self.X_test = handle_categoricals(self.X_test, self.categoricals)
 
         # Add rolling averages and lag averages to training data
         # Remove nulls introduced by resampling and averager
-        self.df = self.df.join(self.averager(self.y))
-        self.df.dropna()
+        self.df = self.df.join(self.averager(self.df.waittime))
+        self.df = self.df.dropna()
 
         # Prepare X, y training data
-        self.y = self.df.waittime
         self.X = self.df.drop('waittime', 1)
-
-        # Add rolling averages and lag averages to first day of test data
-        # Verify that there is training data for day before
-        # first day of test data
-        day_before = self.X_test.index[0] - datetime.timedelta(days=1)
-        if sum(self.y.index.date == day_before) > 0:
-            # Calculate averages from training data
-            # and shift time to match first day of test data
-            averages = self.averager(self.y[self.y.index.date == day_before])
-            averages.index = averages.index.date + datetime.timedelta(days=1)
-
-            self.X_test = self.X_test.join(averages)
-        else:
-            raise ValueError('There must be training data available for day\
-                              before first day of X_test')
+        self.y = self.df.waittime
 
         # Fit the model
         self.model.fit(self.X, self.y)
 
-    def predict(self):
-        Xt = self.X_test
+    def predict(self, X_test):
+        # Prepare test data
+        # X_test should be properly sampled, but resample to be safe
+        self.X_test = X_test.copy()
+        if 'date' in self.X_test:
+            self.X_test = self.X_test.set_index('date')
+        self.X_test = self.X_test.resample(self.sampling)
+
+        # Verify that training data and test data are contiguous
+        if self.X.index[-1].date() != \
+                self.X_test.index[0].date() - dt.timedelta(days=1):
+            raise ValueError('Last day of training data must be day before \
+first day of test data.')
+
+        # Handle categoricals
+        if self.categoricals is not None:
+            self.X_test = handle_categoricals(self.X_test, self.categoricals)
+
+        # Initialize for predictions
         predict = pd.Series()
+        date = self.X_test.index[0].date()
 
-        # Filter first day of test data
-        dt = Xt.index[0]
-        Xt_1 = Xt[Xt.index.date == dt]
+        while sum(self.X_test.index.date == date) > 0:
+            # Add rolling averages and lag averages to training data
+            # Remove nulls introduced by averager
+            # TODO: more performant approach that doesn't require recomputing
+            #       averages for previous training data
+            Xt_1 = self.X_test.join(self.averager(self.y.append(predict)))
+            Xt_1 = Xt_1[Xt_1.index.date == date]
+            Xt_1 = Xt_1.dropna()
 
-        while len(Xt_1) > 0:
             # Predict for 1 day
-            predict_1 = self.predict(Xt_1)
+            predict_1 = pd.Series(self.model.predict(Xt_1), Xt_1.index)
             predict = predict.append(predict_1)
 
-            # Check if there are any more days to predict
-            dt += datetime.timedelta(days=1)
-            if sum(Xt.index.date == dt) == 0:
-                break
-
-            # Add new rolling/lag averages to next day in X_test
-            averages = self.averager(predict_1)
-            Xt = Xt.loc[Xt.index.date == dt, averages.columns] = averages
-
-            # Increment test data by day
-            Xt_1 = Xt[Xt.index.date == dt]
+            date += dt.timedelta(days=1)
 
         return predict
 
@@ -292,10 +324,10 @@ class BorderData(object):
         test_year = min_year + years - 1
 
         while test_year <= max_year:
-            train = df[(df.date >= datetime.date(test_year - years + 1, 1, 1))
-                       & (df.date < datetime.date(test_year, 1, 1))]
-            test = df[(df.date >= datetime.date(test_year, 1, 1))
-                      & (df.date < datetime.date(test_year + 1, 1, 1))]
+            train = df[(df.date >= dt.date(test_year - years + 1, 1, 1))
+                       & (df.date < dt.date(test_year, 1, 1))]
+            test = df[(df.date >= dt.date(test_year, 1, 1))
+                      & (df.date < dt.date(test_year + 1, 1, 1))]
 
             cv.append((list(train.index), list(test.index)))
 
@@ -781,7 +813,7 @@ def model_years(df, model, start, end, categoricals=None):
     '''
     trained = {}
     for year in range(start, end + 1):
-        dfin = df.copy()[df.date < datetime.date(year + 1, 1, 1)]
+        dfin = df.copy()[df.date < dt.date(year + 1, 1, 1)]
         print "Training... ", year
         data = BorderData(dfin, categoricals=categoricals)
 

@@ -162,7 +162,7 @@ def select_mungedata(munger_id, crossing_id, start_date):
     return pd_query(query.format(crossing_id, munger_id, start_date))
 
 
-def select_mungedata_simple(munger_id, crossing_id, start_date):
+def select_mungedata_simple(munger_id, crossing_id, start_date, end_date):
     '''
     Select data with date features only
     '''
@@ -174,19 +174,20 @@ def select_mungedata_simple(munger_id, crossing_id, start_date):
                 month,
                 week,
                 dayofweek,
-                minofday,
+                minofday
             from mungedata m
             join datefeatures d on m.date = d.date
-        where
-            crossing_id = {0}
-            and munger_id = {1}
-            and (minute = 0 or minute = 30)
-            and is_waittime = true
-            and m.date >= '{2}'
-        order by m.date;
-        '''
+            where
+                crossing_id = {0}
+                and munger_id = {1}
+                and (minute = 0 or minute = 30)
+                and is_waittime = true
+                and m.date >= '{2}'
+                and m.date < '{3}'
+            order by m.date;
+            '''
 
-    return pd_query(query.format(crossing_id, munger_id, start_date))
+    return pd_query(query.format(crossing_id, munger_id, start_date, end_date))
 
 
 def select_crossingdata(crossing_id, start_date):
@@ -379,15 +380,37 @@ def select_features_simple(start_date, end_date):
                 month,
                 week,
                 dayofweek,
-                minofday,
+                minofday
             from datefeatures d
-        where
-            d.date >= '{0}' and d.date < '{1}'
-            and (minute = 0 or minute = 30)
-        order by d.date;
-        '''
+            where
+                d.date >= '{0}' and d.date < '{1}'
+                and (minute = 0 or minute = 30)
+            order by d.date;
+            '''
 
     return pd_query(query.format(start_date, end_date)).set_index('date')
+
+
+def select_predictions(munger_id, model_version, crossing_id,
+                       start_date, end_date):
+    '''
+    Select date features only
+    '''
+    query = '''
+            select
+                date,
+                waittime
+            from predictions
+            where
+                munger_id = {0}
+                and model_version = '{1}'
+                and crossing_id = {2}
+                and date >= '{3}' and date < '{4}'
+            order by date;
+            '''
+
+    return pd_query(query.format(munger_id, model_version, crossing_id,
+                                 start_date, end_date)).set_index('date')
 
 
 def insert_predictions(model_id, munger_id, crossing_id, dates, waittime):
