@@ -18,24 +18,34 @@ class TestIncrementalModel(unittest.TestCase):
     def setUp(self):
         self.df = select_mungedata_simple(2, 1, '2011-1-1', '2015-1-1')
         self.xtest = select_features_simple('2015-1-1', '2015-1-10')
+        self.daily_avg = self.df.waittime.resample('D', how='mean')
 
-    def test_daily_average_features(self):
-        df = daily_average_features(self.df.waittime)
-
-        self.assertEqual(df.index[-1], dt.datetime(2015, 1, 1, 23, 30, 0))
-
-        daily_avg = self.df.waittime.resample('D', how='mean')
-
+    def test_daily_average_features_lag(self):
+        df = daily_average_features(self.df.waittime,
+                                    rolling=False, delta=False)
         self.assertAlmostEqual(df.loc['2015-1-1 23:30'].avg_lag_1,
-                               daily_avg.loc['2014-12-31'])
+                               self.daily_avg.loc['2014-12-31'])
         self.assertAlmostEqual(df.loc['2014-2-10 15:30'].avg_lag_3,
-                               daily_avg.loc['2014-2-7'])
+                               self.daily_avg.loc['2014-2-7'])
+
+    def test_daily_average_features_rolling(self):
+        df = daily_average_features(self.df.waittime,
+                                    lag=False, delta=False)
+        self.assertEqual(df.index[-1], dt.datetime(2015, 1, 1, 23, 30, 0))
         self.assertAlmostEqual(df.loc['2014-6-29 3:00'].avg_roll_14,
-                               daily_avg.loc['2014-6-15':'2014-6-28'].mean())
+                               self.daily_avg.loc['2014-6-15':
+                                                  '2014-6-28'].mean())
+
+    def test_daily_average_features_delta(self):
+        df = daily_average_features(self.df.waittime,
+                                    rolling=False, lag=False)
+        self.assertAlmostEqual(df.loc['2014-2-20 15:30'].avg_delta_14,
+                               self.daily_avg.loc['2014-2-19'] -
+                               self.daily_avg.loc['2014-2-5'])
 
     def test_baseline(self):
         model = ExtraTreesRegressor(n_jobs=-1, n_estimators=4)
-        im = IncrementalModel(self.df, model)
+        im = IncrementalModel(self.df, model, percent_nonnull=.8)
         im.predict(self.xtest)
         baseline = im.baseline()
         self.assertEqual(len(baseline), len(im.y_predict))

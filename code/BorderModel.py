@@ -49,8 +49,10 @@ def daily_average_features(series, sampling='30min', percent_nonnull=0.9,
 
     # Calculate deltas of averages
     if delta:
-        for days in [8, 15, 22, 29, 36]:
-            df['avg_delta_{0}'.format(days)] = daily.shift(days - 1) - daily
+        for days in [7, 14, 21, 28, 35]:
+            df['avg_delta_{0}'.format(days)] = daily - daily.shift(days)
+            df['avg_delta_{0}'.format(days)] = \
+                df['avg_delta_{0}'.format(days)].fillna(method='pad')
 
     # Upsample to match original data
     # Resample ends at last index value, so intraday values are not filled
