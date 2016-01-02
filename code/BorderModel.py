@@ -14,65 +14,6 @@ from IPython.display import display
 from BorderQuery import select_mungedata, select_predictions
 
 
-def daily_average_features(series, sampling='30min', percent_nonnull=0.9,
-                           rolling=True, lag=True, delta=True, numdelta=12):
-    '''
-    Builds rolling averages, lag averages and delta averages from a series
-    Grain of 1 day
-
-    IN
-        series: series of label data with time as index
-                assumes no gaps in times series
-        sampling: sampling for output
-        percent_nonnull: minimum percent of observations that each averaging
-                         window must have to return a non-null average value
-        rolling: boolean, enable rolling_means
-        lag: boolean, enable lag averages
-        delta: boolean, enable delta averages
-    OUT
-        dataframe with average features
-            index shifted forward 1 day from input series
-    '''
-    # Create a series of averages by day
-    daily = series.resample('D', how='mean')
-
-    df = pd.DataFrame()
-
-    # Calculate rolling averages
-    if rolling:
-        for days in [7, 14, 21, 28, 366]:
-            df['avg_roll_{0}'.format(days)] = \
-                pd.rolling_mean(daily, days, min_periods=days *
-                                percent_nonnull)
-
-    # Add lag averages
-    # Note that index will be shifted at end of functions,
-    # so lag=1 does not need to be shifted
-    if lag:
-        for days in range(1, 8):
-            df['avg_lag_{0}'.format(days)] = daily.shift(days - 1)
-
-    # Calculate deltas of averages
-    if delta:
-        for weeks in range(1, numdelta + 1):
-            df['avg_delta_{0}'.format(weeks)] = daily - daily.shift(weeks * 7)
-            df['avg_delta_{0}'.format(weeks)] = \
-                df['avg_delta_{0}'.format(weeks)].fillna(method='pad')
-
-    # Upsample to match original data
-    # Resample ends at last index value, so intraday values are not filled
-    # To reconcile, an additional day is added to dataframe
-    ix = pd.DatetimeIndex(start=df.index[0].date(),
-                          end=df.index[-1].date() + dt.timedelta(1), freq='D')
-    df = df.reindex(ix).resample(sampling, fill_method='pad')
-
-    # Shift forward to next day since averages are used as lag features
-    df.index = df.index + dt.timedelta(1)
-
-    # Remove the row corresponding to last day that was added above
-    return df.ix[:-1]
-
-
 class IncrementalModel(object):
     '''
     ATTRIBUTES
@@ -85,15 +26,9 @@ class IncrementalModel(object):
         model: initialized sklearn regressor
     '''
     def __init__(self, df, model, categoricals=None, sampling='30min',
-                 averager=daily_average_features, rolling=True, lag=True,
-                 delta=True, percent_nonnull=0.9, numdelta=12):
+                 numdelta=12):
         self.model = model
-        self.averager = averager
         self.sampling = sampling
-        self.percent_nonnull = percent_nonnull
-        self.rolling = rolling
-        self.lag = lag
-        self.delta = delta
         self.numdelta = numdelta
 
         # Prepare training data
@@ -108,13 +43,10 @@ class IncrementalModel(object):
         if self.categoricals is not None:
             self.df = handle_categoricals(self.df, self.categoricals)
 
-        # Add rolling averages and lag averages to training data
+        # Add delta averages to training data
         # Remove nulls introduced by resampling and averager
         self.df = self.df.resample(self.sampling)
-        self.df = self.df.join(self.averager(self.df.waittime,
-                               percent_nonnull=self.percent_nonnull,
-                               rolling=self.rolling, lag=self.lag,
-                               delta=self.delta, numdelta=self.numdelta))
+        self.df = self.df.join(self.deltas(self.df.waittime))
         self.df = self.df.dropna()
 
         # Prepare X, y training data
@@ -145,21 +77,17 @@ first day of test data.')
         # Initialize for predictions
         predict = pd.Series()
         date = self.X_test.index[0].date()
+        y_test = self.y.resample(self.sampling)
 
         while sum(self.X_test.index.date == date) > 0:
-            # Add rolling averages and lag averages to training data
-            # Remove nulls introduced by averager
+            # Add delta averages to training data
             # TODO: more performant approach that doesn't require recomputing
             #       averages for previous training data
-            Xt_1 = self.X_test.join(self.averager(self.y.append(predict),
-                                    percent_nonnull=self.percent_nonnull,
-                                    rolling=self.rolling, lag=self.lag,
-                                    delta=self.delta, numdelta=self.numdelta))
+            Xt_1 = self.X_test.join(self.deltas(y_test.append(predict)))
             Xt_1 = Xt_1[Xt_1.index.date == date]
             Xt_1 = Xt_1.dropna()
             if len(Xt_1) == 0:
-                raise ValueError('Test data is all nulls after averager.  \
-Consider setting percent_nonnull to lower value.')
+                raise ValueError('Test data is all nulls after averager.')
 
             # Predict for 1 day
             predict_1 = pd.Series(self.model.predict(Xt_1), Xt_1.index)
@@ -199,7 +127,7 @@ Consider setting percent_nonnull to lower value.')
         # Combine
         baseline = baseline.merge(dow_avg).set_index('date')
 
-        return baseline.waittime
+        return baseline.waittime.sort_index()
 
     def ensemble(self, actual, baseline):
         '''
@@ -236,6 +164,41 @@ Consider setting percent_nonnull to lower value.')
                     'baseline': baseline_r2}
         else:
             raise RuntimeError('predict must be called before score')
+
+    def deltas(self, series):
+        '''
+        Builds delta averages from a series; grain of 1 day
+
+        IN
+            series: series of label data with time as index
+                    assumes no gaps in times series
+        OUT
+            dataframe with average features
+                index shifted forward 1 day from input series
+        '''
+        # Create a series of averages by day
+        daily = series.resample('D', how='mean')
+
+        # Construct deltas using time shift; fill forward for any gaps
+        df = pd.DataFrame()
+        for weeks in range(1, self.numdelta + 1):
+            df['avg_delta_{0}'.format(weeks)] = daily - daily.shift(weeks * 7)
+            df['avg_delta_{0}'.format(weeks)] = \
+                df['avg_delta_{0}'.format(weeks)].fillna(method='pad')
+
+        # Upsample to match original data
+        # Resample ends at last index value, so intraday values are not filled
+        # To reconcile, an additional day is added to dataframe
+        ix = pd.DatetimeIndex(start=df.index[0].date(),
+                              end=df.index[-1].date() + dt.timedelta(1),
+                              freq='D')
+        df = df.reindex(ix).resample(self.sampling, fill_method='pad')
+
+        # Shift forward to next day since deltas are used as lag features
+        df.index = df.index + dt.timedelta(1)
+
+        # Remove the row corresponding to last day that was added above
+        return df.ix[:-1]
 
 
 class BorderData(object):

@@ -2,7 +2,7 @@ import unittest2 as unittest
 from BorderModel import BorderData, clean_df_subset, handle_categoricals
 from BorderModel import BorderImpute, xy_laglead
 from BorderModel import create_neighbor_features, create_leadlag
-from BorderModel import IncrementalModel, daily_average_features
+from BorderModel import IncrementalModel
 from dbhelper import pd_query
 import copy
 from random import randint
@@ -20,37 +20,21 @@ class TestIncrementalModel(unittest.TestCase):
         self.xtest = select_features_simple('2015-1-1', '2015-1-10')
         self.daily_avg = self.df.waittime.resample('D', how='mean')
 
-    def test_daily_average_features_lag(self):
-        df = daily_average_features(self.df.waittime,
-                                    rolling=False, delta=False)
-        self.assertAlmostEqual(df.loc['2015-1-1 23:30'].avg_lag_1,
-                               self.daily_avg.loc['2014-12-31'])
-        self.assertAlmostEqual(df.loc['2014-2-10 15:30'].avg_lag_3,
-                               self.daily_avg.loc['2014-2-7'])
+        model = RandomForestRegressor(n_jobs=-1, n_estimators=4)
+        self.im = IncrementalModel(self.df, model)
+        self.im.predict(self.xtest)
 
-    def test_daily_average_features_rolling(self):
-        df = daily_average_features(self.df.waittime,
-                                    lag=False, delta=False)
-        self.assertEqual(df.index[-1], dt.datetime(2015, 1, 1, 23, 30, 0))
-        self.assertAlmostEqual(df.loc['2014-6-29 3:00'].avg_roll_14,
-                               self.daily_avg.loc['2014-6-15':
-                                                  '2014-6-28'].mean())
-
-    def test_daily_average_features_delta(self):
-        df = daily_average_features(self.df.waittime,
-                                    rolling=False, lag=False)
-        self.assertAlmostEqual(df.loc['2014-2-20 15:30'].avg_delta_14,
+    def test_deltas(self):
+        df = self.im.deltas(self.df.waittime)
+        self.assertAlmostEqual(df.loc['2014-2-20 15:30'].avg_delta_2,
                                self.daily_avg.loc['2014-2-19'] -
                                self.daily_avg.loc['2014-2-5'])
 
     def test_baseline(self):
-        model = RandomForestRegressor(n_jobs=-1, n_estimators=4)
-        im = IncrementalModel(self.df, model)
-        im.predict(self.xtest)
-        baseline = im.baseline()
-        self.assertEqual(len(baseline), len(im.y_predict))
-        self.assertEqual(baseline.loc['2015-1-2 21:30'][0],
-                         baseline.loc['2015-1-9 21:30'][0])
+        baseline = self.im.baseline()
+        self.assertEqual(len(baseline), len(self.im.y_predict))
+        self.assertEqual(baseline.loc['2015-1-2 21:30'],
+                         baseline.loc['2015-1-9 21:30'])
 
 
 class TestBorderImpute(unittest.TestCase):
