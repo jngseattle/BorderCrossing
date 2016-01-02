@@ -15,9 +15,10 @@ from BorderQuery import select_mungedata, select_predictions
 
 
 def daily_average_features(series, sampling='30min', percent_nonnull=0.9,
-                           rolling=True, lag=True, delta=True):
+                           rolling=True, lag=True, delta=True, numdelta=12):
     '''
-    Builds rolling averages and lag averages from a series; grain of 1 day
+    Builds rolling averages, lag averages and delta averages from a series
+    Grain of 1 day
 
     IN
         series: series of label data with time as index
@@ -25,6 +26,9 @@ def daily_average_features(series, sampling='30min', percent_nonnull=0.9,
         sampling: sampling for output
         percent_nonnull: minimum percent of observations that each averaging
                          window must have to return a non-null average value
+        rolling: boolean, enable rolling_means
+        lag: boolean, enable lag averages
+        delta: boolean, enable delta averages
     OUT
         dataframe with average features
             index shifted forward 1 day from input series
@@ -38,7 +42,8 @@ def daily_average_features(series, sampling='30min', percent_nonnull=0.9,
     if rolling:
         for days in [7, 14, 21, 28, 366]:
             df['avg_roll_{0}'.format(days)] = \
-                pd.rolling_mean(daily, days, min_periods=days * percent_nonnull)
+                pd.rolling_mean(daily, days, min_periods=days *
+                                percent_nonnull)
 
     # Add lag averages
     # Note that index will be shifted at end of functions,
@@ -49,10 +54,10 @@ def daily_average_features(series, sampling='30min', percent_nonnull=0.9,
 
     # Calculate deltas of averages
     if delta:
-        for days in [7, 14, 21, 28, 35, 42, 49, 56]:
-            df['avg_delta_{0}'.format(days)] = daily - daily.shift(days)
-            df['avg_delta_{0}'.format(days)] = \
-                df['avg_delta_{0}'.format(days)].fillna(method='pad')
+        for weeks in range(1, numdelta + 1):
+            df['avg_delta_{0}'.format(weeks)] = daily - daily.shift(weeks * 7)
+            df['avg_delta_{0}'.format(weeks)] = \
+                df['avg_delta_{0}'.format(weeks)].fillna(method='pad')
 
     # Upsample to match original data
     # Resample ends at last index value, so intraday values are not filled
@@ -81,7 +86,7 @@ class IncrementalModel(object):
     '''
     def __init__(self, df, model, categoricals=None, sampling='30min',
                  averager=daily_average_features, rolling=True, lag=True,
-                 delta=True, percent_nonnull=0.9):
+                 delta=True, percent_nonnull=0.9, numdelta=12):
         self.model = model
         self.averager = averager
         self.sampling = sampling
@@ -89,6 +94,7 @@ class IncrementalModel(object):
         self.rolling = rolling
         self.lag = lag
         self.delta = delta
+        self.numdelta = numdelta
 
         # Prepare training data
         # Resample to remove gaps, inserting NA's
@@ -108,7 +114,7 @@ class IncrementalModel(object):
         self.df = self.df.join(self.averager(self.df.waittime,
                                percent_nonnull=self.percent_nonnull,
                                rolling=self.rolling, lag=self.lag,
-                               delta=self.delta))
+                               delta=self.delta, numdelta=self.numdelta))
         self.df = self.df.dropna()
 
         # Prepare X, y training data
@@ -148,7 +154,7 @@ first day of test data.')
             Xt_1 = self.X_test.join(self.averager(self.y.append(predict),
                                     percent_nonnull=self.percent_nonnull,
                                     rolling=self.rolling, lag=self.lag,
-                                    delta=self.delta))
+                                    delta=self.delta, numdelta=self.numdelta))
             Xt_1 = Xt_1[Xt_1.index.date == date]
             Xt_1 = Xt_1.dropna()
             if len(Xt_1) == 0:
@@ -170,10 +176,14 @@ Consider setting percent_nonnull to lower value.')
         Compute baseline prediction based on day of week for last year of
         training data
         '''
-        # Calculate day of week averages
-        year = self.y.index[-1].date().year
-        y_last = self.y[(self.y.index.date >= dt.date(year, 1, 1)) &
-                        (self.y.index.date < dt.date(year + 1, 1, 1))]
+        # Find last time period; correct for leap day
+        last = self.y.index[-1]
+        if last.month == 2 and last.day == 29:
+            last = last - dt.timedelta(1)
+
+        # Calculate day of week averages for last year
+        y_last = self.y[(self.y.index > last - dt.timedelta(365)) &
+                        (self.y.index <= last)]
         dow_avg = y_last.groupby([y_last.index.dayofweek,
                                   y_last.index.hour,
                                   y_last.index.minute]).mean().reset_index()
@@ -191,22 +201,39 @@ Consider setting percent_nonnull to lower value.')
 
         return baseline.waittime
 
+    def ensemble(self, actual, baseline):
+        '''
+        Ensemble predictions with baseline optimized for test values
+
+        IN
+            actual: test data
+            baseline: baseline data
+        '''
+        # Compute weights.  Since actual may have missing data, predictions
+        # and baseline are filtered
+        # Harmonic mean is used for ensembling
+        wy, wb = optimize_scalar_weights(actual,
+                                         (self.y_predict.loc[actual.index],
+                                          baseline.loc[actual.index]))
+
+        print "Weights: ", wy, wb
+        return harmonic_mean((baseline.loc[actual.index],
+                             self.y_predict.loc[actual.index]), (wy, wb))
+
     def score(self, actual):
         if hasattr(self, 'y_predict'):
             actual = actual.resample(self.sampling, how='mean').dropna()
 
-            print "Model R2: ",\
-                r2_score(actual, self.y_predict.loc[actual.index])
+            model_r2 = r2_score(actual, self.y_predict.loc[actual.index])
 
             baseline = self.baseline()
-            print "Baseline R2: ", \
-                r2_score(actual, baseline.loc[actual.index])
+            baseline_r2 = r2_score(actual, baseline.loc[actual.index])
 
-            ensemble = harmonic_mean((baseline.loc[actual.index],
-                                     self.y_predict.loc[actual.index]), (1, 1))
-            print "Ensemble R2: ", \
-                r2_score(actual, ensemble)
+            ensemble = self.ensemble(actual, baseline)
+            ensemble_r2 = r2_score(actual, ensemble)
 
+            return {'model': model_r2, 'ensemble': ensemble_r2,
+                    'baseline': baseline_r2}
         else:
             raise RuntimeError('predict must be called before score')
 
