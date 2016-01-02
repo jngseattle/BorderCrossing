@@ -13,19 +13,19 @@ from ipywidgets import FloatProgress
 from IPython.display import display
 
 
-def label_averages(series, upsample='30min', percent_nonnull=.9):
+def label_averages(series, sampling='30min', percent_nonnull=.8):
     '''
     Builds rolling averages and lag averages from a series; grain of 1 day
 
     IN
         series: series of label data with time as index
                 assumes no gaps in times series
-        upsample: sampling for output
+        sampling: sampling for output
         percent_nonnull: minimum percent of observations that each averaging
                          window must have to return a non-null average value
     OUT
         dataframe with average features
-            index shifted shifted forward 1 day from input series
+            index shifted forward 1 day from input series
     '''
     # Create a series of averages by day
     daily = series.resample('D', how='mean')
@@ -38,15 +38,17 @@ def label_averages(series, upsample='30min', percent_nonnull=.9):
             pd.rolling_mean(daily, days, min_periods=days * percent_nonnull)
 
     # Add lag averages
+    # Note that index will be shifted at end of functions,
+    # so lag=1 does not need to be shifted
     for days in range(1, 8):
-        df['avg_lag_{0}'.format(days)] = daily.shift(days)
+        df['avg_lag_{0}'.format(days)] = daily.shift(days - 1)
 
     # Upsample to match original data
     # Resample ends at last index value, so df is extended by one day
     # to fill averages for times during last day
     ix = pd.DatetimeIndex(start=df.index[0].date(),
                           end=df.index[-1].date() + dt.timedelta(1), freq='D')
-    df = df.reindex(ix).resample(upsample, fill_method='pad')
+    df = df.reindex(ix).resample(sampling, fill_method='pad')
 
     # Shift forward to next day since averages are used as lag features
     df.index = df.index + dt.timedelta(1)
@@ -94,7 +96,6 @@ class IncrementalModel(object):
         self.df = df.copy()
         if 'date' in self.df:
             self.df = self.df.set_index('date')
-        self.df = self.df.resample(self.sampling)
 
         # Add categoricals
         self.categoricals = categoricals
@@ -103,6 +104,7 @@ class IncrementalModel(object):
 
         # Add rolling averages and lag averages to training data
         # Remove nulls introduced by resampling and averager
+        self.df = self.df.resample(self.sampling)
         self.df = self.df.join(self.averager(self.df.waittime))
         self.df = self.df.dropna()
 
@@ -145,7 +147,10 @@ first day of test data.')
             Xt_1 = Xt_1.dropna()
 
             # Predict for 1 day
-            predict_1 = pd.Series(self.model.predict(Xt_1), Xt_1.index)
+            try:
+                predict_1 = pd.Series(self.model.predict(Xt_1), Xt_1.index)
+            except:
+                pdb.set_trace()
             predict = predict.append(predict_1)
 
             date += dt.timedelta(days=1)
@@ -732,20 +737,20 @@ def create_dummies(df, cols, drop=False):
     return newdf
 
 
-def handle_categoricals(df, suffix):
+def handle_categoricals(df, prefix):
     '''
     One hot encoding of features with matching suffix
 
     IN
         df: dataframe
-        suffix: string suffix of feature name
+        prefix: string prefix of feature name
     OUT
         dataframe with original feature removed and encoded features added
     '''
-    # TODO: match beginning of label name
     df1 = df.copy()
 
-    for cat in suffix:
+    # TODO: match beginning of label name
+    for cat in prefix:
         # Remove categoricals from df
         for col in df1.columns:
             if cat in col:

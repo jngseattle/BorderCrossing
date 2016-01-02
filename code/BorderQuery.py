@@ -1,7 +1,7 @@
 from dbhelper import pd_query, PgDB
 
 
-def select_mungedata(munger_id, crossing_id, start_date):
+def select_mungedata(munger_id, crossing_id, start_date, end_date):
     query = '''
             select
                 m.date,
@@ -156,10 +156,11 @@ def select_mungedata(munger_id, crossing_id, start_date):
             and (minute = 0 or minute = 30)
             and is_waittime = true
             and m.date >= '{2}'
+            and m.date < '{3}'
         order by m.date;
         '''
 
-    return pd_query(query.format(crossing_id, munger_id, start_date))
+    return pd_query(query.format(crossing_id, munger_id, start_date, end_date))
 
 
 def select_mungedata_simple(munger_id, crossing_id, start_date, end_date):
