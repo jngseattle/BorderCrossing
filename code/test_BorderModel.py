@@ -2,18 +2,48 @@ import unittest2 as unittest
 from BorderModel import BorderData, clean_df_subset, handle_categoricals
 from BorderModel import BorderImpute, xy_laglead
 from BorderModel import create_neighbor_features, create_leadlag
+from BorderModel import IncrementalModel, daily_average_features
 from dbhelper import pd_query
 import copy
 from random import randint
 import numpy as np
 import pandas as pd
+import datetime as dt
 import pdb
+from BorderQuery import select_mungedata_simple, select_features_simple
+from sklearn.ensemble import ExtraTreesRegressor
+
+
+class TestIncrementalModel(unittest.TestCase):
+    def setUp(self):
+        self.df = select_mungedata_simple(2, 1, '2011-1-1', '2015-1-1')
+        self.xtest = select_features_simple('2015-1-1', '2015-1-10')
+
+    def test_daily_average_features(self):
+        df = daily_average_features(self.df.waittime)
+
+        self.assertEqual(df.index[-1], dt.datetime(2015, 1, 1, 23, 30, 0))
+
+        daily_avg = self.df.waittime.resample('D', how='mean')
+
+        self.assertAlmostEqual(df.loc['2015-1-1 23:30'].avg_lag_1,
+                               daily_avg.loc['2014-12-31'])
+        self.assertAlmostEqual(df.loc['2014-2-10 15:30'].avg_lag_3,
+                               daily_avg.loc['2014-2-7'])
+        self.assertAlmostEqual(df.loc['2014-6-29 3:00'].avg_roll_14,
+                               daily_avg.loc['2014-6-15':'2014-6-28'].mean())
+
+    def test_baseline(self):
+        model = ExtraTreesRegressor(n_jobs=-1, n_estimators=4)
+        im = IncrementalModel(self.df, model)
+        im.predict(self.xtest)
+        baseline = im.baseline()
+        self.assertEqual(len(baseline), len(im.y_predict))
+        self.assertEqual(baseline.loc['2015-1-2 21:30'][0],
+                         baseline.loc['2015-1-9 21:30'][0])
 
 
 class TestBorderImpute(unittest.TestCase):
-    def setUp(self):
-        pass
-
     def test_create_neighbor_features(self):
         df0 = pd.DataFrame(np.array([3, 6, 9, 6, 2, 3, 5, 7, 9, 0]),
                            columns=('data',))

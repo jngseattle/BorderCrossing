@@ -160,7 +160,9 @@ def select_mungedata(munger_id, crossing_id, start_date, end_date):
         order by m.date;
         '''
 
-    return pd_query(query.format(crossing_id, munger_id, start_date, end_date))
+    return pd_query(query.format(crossing_id,
+                                 munger_id,
+                                 start_date, end_date)).set_index('date')
 
 
 def select_mungedata_simple(munger_id, crossing_id, start_date, end_date):
@@ -188,7 +190,9 @@ def select_mungedata_simple(munger_id, crossing_id, start_date, end_date):
             order by m.date;
             '''
 
-    return pd_query(query.format(crossing_id, munger_id, start_date, end_date))
+    return pd_query(query.format(crossing_id,
+                                 munger_id,
+                                 start_date, end_date)).set_index('date')
 
 
 def select_crossingdata(crossing_id, start_date):
@@ -211,7 +215,7 @@ def select_crossingdata(crossing_id, start_date):
         order by c.date;
         '''
 
-    return pd_query(query.format(crossing_id, start_date))
+    return pd_query(query.format(crossing_id, start_date)).set_index('date')
 
 
 def select_features(start_date, end_date):

@@ -11,9 +11,11 @@ import statsmodels.api as sm
 import copy
 from ipywidgets import FloatProgress
 from IPython.display import display
+from BorderQuery import select_mungedata, select_predictions
 
 
-def label_averages(series, sampling='30min', percent_nonnull=.8):
+def daily_average_features(series, sampling='30min', percent_nonnull=0.9,
+                           rolling=True, lag=True, delta=True):
     '''
     Builds rolling averages and lag averages from a series; grain of 1 day
 
@@ -33,19 +35,26 @@ def label_averages(series, sampling='30min', percent_nonnull=.8):
     df = pd.DataFrame()
 
     # Calculate rolling averages
-    for days in [7, 14, 21, 28, 366]:
-        df['avg_roll_{0}'.format(days)] = \
-            pd.rolling_mean(daily, days, min_periods=days * percent_nonnull)
+    if rolling:
+        for days in [7, 14, 21, 28, 366]:
+            df['avg_roll_{0}'.format(days)] = \
+                pd.rolling_mean(daily, days, min_periods=days * percent_nonnull)
 
     # Add lag averages
     # Note that index will be shifted at end of functions,
     # so lag=1 does not need to be shifted
-    for days in range(1, 8):
-        df['avg_lag_{0}'.format(days)] = daily.shift(days - 1)
+    if lag:
+        for days in range(1, 8):
+            df['avg_lag_{0}'.format(days)] = daily.shift(days - 1)
+
+    # Calculate deltas of averages
+    if delta:
+        for days in [8, 15, 22, 29, 36]:
+            df['avg_delta_{0}'.format(days)] = daily.shift(days - 1) - daily
 
     # Upsample to match original data
-    # Resample ends at last index value, so df is extended by one day
-    # to fill averages for times during last day
+    # Resample ends at last index value, so intraday values are not filled
+    # To reconcile, an additional day is added to dataframe
     ix = pd.DatetimeIndex(start=df.index[0].date(),
                           end=df.index[-1].date() + dt.timedelta(1), freq='D')
     df = df.reindex(ix).resample(sampling, fill_method='pad')
@@ -53,24 +62,8 @@ def label_averages(series, sampling='30min', percent_nonnull=.8):
     # Shift forward to next day since averages are used as lag features
     df.index = df.index + dt.timedelta(1)
 
-    return df
-
-
-def lag_features(series, period=48):
-    '''
-    IN
-        series
-        period: number of periods in 1 day
-    OUT
-        dataframe of lag features with same index as input series
-    '''
-    df = pd.DataFrame()
-
-    # Calculate lag features
-    for days in [1, 2, 3, 4, 5, 6, 7, 14, 21, 28]:
-        df['lag_{0}'.format(days)] = series.shift(days * period)
-
-    return df
+    # Remove the row corresponding to last day that was added above
+    return df.ix[:-1]
 
 
 class IncrementalModel(object):
@@ -85,10 +78,15 @@ class IncrementalModel(object):
         model: initialized sklearn regressor
     '''
     def __init__(self, df, model, categoricals=None, sampling='30min',
-                 averager=label_averages):
+                 averager=daily_average_features, rolling=True, lag=True,
+                 delta=True, percent_nonnull=0.9):
         self.model = model
-        self.averager = label_averages
+        self.averager = averager
         self.sampling = sampling
+        self.percent_nonnull = percent_nonnull
+        self.rolling = rolling
+        self.lag = lag
+        self.delta = delta
 
         # Prepare training data
         # Resample to remove gaps, inserting NA's
@@ -105,7 +103,10 @@ class IncrementalModel(object):
         # Add rolling averages and lag averages to training data
         # Remove nulls introduced by resampling and averager
         self.df = self.df.resample(self.sampling)
-        self.df = self.df.join(self.averager(self.df.waittime))
+        self.df = self.df.join(self.averager(self.df.waittime,
+                               percent_nonnull=self.percent_nonnull,
+                               rolling=self.rolling, lag=self.lag,
+                               delta=self.delta))
         self.df = self.df.dropna()
 
         # Prepare X, y training data
@@ -142,20 +143,70 @@ first day of test data.')
             # Remove nulls introduced by averager
             # TODO: more performant approach that doesn't require recomputing
             #       averages for previous training data
-            Xt_1 = self.X_test.join(self.averager(self.y.append(predict)))
+            Xt_1 = self.X_test.join(self.averager(self.y.append(predict),
+                                    percent_nonnull=self.percent_nonnull,
+                                    rolling=self.rolling, lag=self.lag,
+                                    delta=self.delta))
             Xt_1 = Xt_1[Xt_1.index.date == date]
             Xt_1 = Xt_1.dropna()
+            if len(Xt_1) == 0:
+                raise ValueError('Test data is all nulls after averager.  \
+Consider setting percent_nonnull to lower value.')
 
             # Predict for 1 day
-            try:
-                predict_1 = pd.Series(self.model.predict(Xt_1), Xt_1.index)
-            except:
-                pdb.set_trace()
+            predict_1 = pd.Series(self.model.predict(Xt_1), Xt_1.index)
             predict = predict.append(predict_1)
 
             date += dt.timedelta(days=1)
 
+        self.y_predict = predict
+
         return predict
+
+    def baseline(self):
+        '''
+        Compute baseline prediction based on day of week for last year of
+        training data
+        '''
+        # Calculate day of week averages
+        year = self.y.index[-1].date().year
+        y_last = self.y[(self.y.index.date >= dt.date(year, 1, 1)) &
+                        (self.y.index.date < dt.date(year + 1, 1, 1))]
+        dow_avg = y_last.groupby([y_last.index.dayofweek,
+                                  y_last.index.hour,
+                                  y_last.index.minute]).mean().reset_index()
+        dow_avg.columns = ['dow', 'hour', 'minute', 'waittime']
+
+        # Build dataframe with same shape and date index as y_predict
+        baseline = pd.DataFrame(self.y_predict.index,
+                                self.y_predict.index)
+        baseline['dow'] = baseline.index.dayofweek
+        baseline['hour'] = baseline.index.hour
+        baseline['minute'] = baseline.index.minute
+
+        # Combine
+        baseline = baseline.merge(dow_avg).set_index('date')
+
+        return baseline.waittime
+
+    def score(self, actual):
+        if hasattr(self, 'y_predict'):
+            actual = actual.resample(self.sampling, how='mean').dropna()
+
+            print "Model R2: ",\
+                r2_score(actual, self.y_predict.loc[actual.index])
+
+            baseline = self.baseline()
+            print "Baseline R2: ", \
+                r2_score(actual, baseline.loc[actual.index])
+
+            ensemble = (baseline.loc[actual.index] +
+                        self.y_predict.loc[actual.index]) / 2.
+            print "Ensemble R2: ", \
+                r2_score(actual, ensemble)
+
+        else:
+            raise RuntimeError('predict must be called before score')
 
 
 class BorderData(object):
