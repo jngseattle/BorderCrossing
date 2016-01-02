@@ -11,7 +11,7 @@ import pandas as pd
 import datetime as dt
 import pdb
 from BorderQuery import select_mungedata_simple, select_features_simple
-from sklearn.ensemble import ExtraTreesRegressor
+from sklearn.ensemble import RandomForestRegressor
 
 
 class TestIncrementalModel(unittest.TestCase):
@@ -44,8 +44,8 @@ class TestIncrementalModel(unittest.TestCase):
                                self.daily_avg.loc['2014-2-5'])
 
     def test_baseline(self):
-        model = ExtraTreesRegressor(n_jobs=-1, n_estimators=4)
-        im = IncrementalModel(self.df, model, percent_nonnull=.8)
+        model = RandomForestRegressor(n_jobs=-1, n_estimators=4)
+        im = IncrementalModel(self.df, model)
         im.predict(self.xtest)
         baseline = im.baseline()
         self.assertEqual(len(baseline), len(im.y_predict))

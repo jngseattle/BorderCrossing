@@ -49,7 +49,7 @@ def daily_average_features(series, sampling='30min', percent_nonnull=0.9,
 
     # Calculate deltas of averages
     if delta:
-        for days in [7, 14, 21, 28, 35]:
+        for days in [7, 14, 21, 28, 35, 42, 49, 56]:
             df['avg_delta_{0}'.format(days)] = daily - daily.shift(days)
             df['avg_delta_{0}'.format(days)] = \
                 df['avg_delta_{0}'.format(days)].fillna(method='pad')
@@ -202,8 +202,8 @@ Consider setting percent_nonnull to lower value.')
             print "Baseline R2: ", \
                 r2_score(actual, baseline.loc[actual.index])
 
-            ensemble = (baseline.loc[actual.index] +
-                        self.y_predict.loc[actual.index]) / 2.
+            ensemble = harmonic_mean((baseline.loc[actual.index],
+                                     self.y_predict.loc[actual.index]), (1, 1))
             print "Ensemble R2: ", \
                 r2_score(actual, ensemble)
 
