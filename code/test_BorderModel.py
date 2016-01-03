@@ -2,7 +2,7 @@ import unittest2 as unittest
 from BorderModel import BorderData, clean_df_subset, handle_categoricals
 from BorderModel import BorderImpute, xy_laglead
 from BorderModel import create_neighbor_features, create_leadlag
-from BorderModel import IncrementalModel
+from BorderModel import IncrementalModel, run_Incremental
 from dbhelper import pd_query
 import copy
 from random import randint
@@ -10,18 +10,21 @@ import numpy as np
 import pandas as pd
 import datetime as dt
 import pdb
-from BorderQuery import select_mungedata_simple, select_features_simple
+from BorderQuery import select_mungedata_simple, select_features_simple, \
+    select_mungedata, select_features
 from sklearn.ensemble import RandomForestRegressor
 
 
 class TestIncrementalModel(unittest.TestCase):
     def setUp(self):
-        self.df = select_mungedata_simple(2, 1, '2011-1-1', '2015-1-1')
-        self.xtest = select_features_simple('2015-1-1', '2015-1-10')
+        self.df = select_mungedata(2, 1, '2013-1-1', '2015-1-1')
+        self.xtest = select_features('2015-1-1', '2015-1-10')
+        self.actuals = select_mungedata_simple(2, 1, '2015-1-1', '2015-1-10')
         self.daily_avg = self.df.waittime.resample('D', how='mean')
 
-        model = RandomForestRegressor(n_jobs=-1, n_estimators=4)
-        self.im = IncrementalModel(self.df, model)
+        model = RandomForestRegressor(n_jobs=-1, n_estimators=2,
+                                      random_state=1)
+        self.im = IncrementalModel(self.df, model, categoricals=['event'])
         self.im.predict(self.xtest)
 
     def test_deltas(self):
@@ -40,7 +43,15 @@ class TestIncrementalModel(unittest.TestCase):
         actual = select_mungedata_simple(2, 1, '2015-1-1', '2015-1-10')
         self.im.set_actual(actual.waittime)
         self.assertEqual(actual.ix[24].waittime, self.im.actual.ix[24])
-        
+
+    def test_run_Incremental(self):
+        model = RandomForestRegressor(n_jobs=-1, n_estimators=2,
+                                      random_state=1)
+        im = run_Incremental(model, 2, 1, '2013-1-1', '2015-1-1',
+                             '2015-1-1', '2015-1-10')
+
+        self.assertEqual(im.score(), self.im.score(self.actuals.waittime))
+
 
 class TestBorderImpute(unittest.TestCase):
     def test_create_neighbor_features(self):
@@ -64,9 +75,8 @@ class TestBorderImpute(unittest.TestCase):
         df0 = pd.DataFrame(np.hstack((y0.reshape(len(y0), 1), X0)),
                            columns=('y', 'waittime', 'volume'))
 
-        # Test
         df = create_leadlag(df0)
-        # pdb.set_trace()
+
         self.assertTrue((pd.isnull(df0.waittime.shift(-1)) |
                         (df.waittime_lead_1 == df0.waittime.shift(-1))).all())
         self.assertTrue((pd.isnull(df0.waittime.shift(-2)) |
@@ -252,19 +262,34 @@ class TestBorderData(unittest.TestCase):
 
     def test_handle_categoricals(self):
         events = np.array([['mlk', None, 3], [None, 'newyears', 2]])
-        df = pd.DataFrame(events, columns=['event', 'event_lag', 'delay'])
-        dfout = handle_categoricals(df, ['event'])
+        index = ['c', 'b']
+        df = pd.DataFrame(events, index,
+                          columns=['event', 'event_lag', 'delay'])
+        df.index.name = 'title'
+        columns = ['delay', 'event_mlk', 'insertion', 'event_lag_newyears']
+        dfout = handle_categoricals(df, ['event'], columns=columns)
 
         self.assertTrue(np.array_equal(dfout.columns.values,
                                        np.array(['delay',
                                                  'event_mlk',
+                                                 'insertion',
                                                  'event_lag_newyears'])))
+        self.assertFalse(np.array_equal(dfout.columns.values,
+                                        np.array(['delay',
+                                                  'event_mlk',
+                                                  'event_lag_newyears',
+                                                  'insertion'])))
         self.assertTrue(np.array_equal(dfout.event_mlk.values,
                                        np.array([1, 0])))
         self.assertTrue(np.array_equal(dfout.event_lag_newyears.values,
                                        np.array([0, 1])))
         self.assertTrue(np.array_equal(dfout.delay.values,
                                        np.array([3, 2])))
+        self.assertTrue(np.array_equal(dfout.insertion.values,
+                                       np.array([0, 0])))
+        self.assertTrue(np.array_equal(dfout.index.values,
+                                       np.array(['c', 'b'])))
+        self.assertEqual('title', dfout.index.name)
 
 
 if __name__ == '__main__':

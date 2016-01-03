@@ -11,7 +11,8 @@ import statsmodels.api as sm
 import copy
 from ipywidgets import FloatProgress
 from IPython.display import display
-from BorderQuery import select_mungedata, select_predictions
+from BorderQuery import select_mungedata, select_predictions, \
+    select_features, select_mungedata_simple
 
 
 class IncrementalModel(object):
@@ -73,8 +74,12 @@ class IncrementalModel(object):
 first day of test data.')
 
         # Handle categoricals
+        # Align columns to X, excluding delta columns
         if self.categoricals is not None:
-            self.X_test = handle_categoricals(self.X_test, self.categoricals)
+            columns = [col for col in self.X.columns.values
+                       if 'avg_delta' not in col]
+            self.X_test = handle_categoricals(self.X_test, self.categoricals,
+                                              columns=columns)
 
         # Initialize for predictions
         predict = pd.Series()
@@ -85,6 +90,7 @@ first day of test data.')
             # Add delta averages to training data
             # TODO: more performant approach that doesn't require recomputing
             #       averages for previous training data
+            test = self.deltas(y_test.append(predict))
             Xt_1 = self.X_test.join(self.deltas(y_test.append(predict)))
             Xt_1 = Xt_1[Xt_1.index.date == date]
             Xt_1 = Xt_1.dropna()
@@ -218,6 +224,20 @@ first day of test data.')
 
         # Remove the row corresponding to last day that was added above
         return df.ix[:-1]
+
+
+def run_Incremental(model, munger_id, xing, train_start, train_end,
+                    test_start, test_end):
+    df_train = select_mungedata(munger_id, xing, train_start, train_end)
+    X_test = select_features(test_start, test_end)
+    actual = select_mungedata_simple(munger_id, xing, test_start, test_end)
+
+    grid = GridSearchCV(model, {})
+    im = IncrementalModel(df_train, grid, categoricals=['event'])
+    im.set_actual(actual.waittime)
+    im.predict(X_test)
+
+    return im
 
 
 class BorderData(object):
@@ -799,13 +819,14 @@ def create_dummies(df, cols, drop=False):
     return newdf
 
 
-def handle_categoricals(df, prefix):
+def handle_categoricals(df, prefix, columns=None):
     '''
     One hot encoding of features with matching suffix
 
     IN
         df: dataframe
         prefix: string prefix of feature name
+        columns: list of columns to match on output dataframe
     OUT
         dataframe with original feature removed and encoded features added
     '''
@@ -820,6 +841,19 @@ def handle_categoricals(df, prefix):
 
         cols = [c for c in df.columns.values if cat in c]
         df1 = df1.join(create_dummies(df, cols))
+
+    # Build a new dataframe aligned to 'columns'
+    if columns is not None:
+        dftemp = pd.DataFrame()
+        for col in columns:
+            if col in df1.columns:
+                dftemp[col] = df1[col].values
+            else:
+                dftemp[col] = 0
+        dftemp.index = df1.index.values
+        dftemp.index.name = df1.index.name
+
+        df1 = dftemp
 
     return df1
 
@@ -848,7 +882,8 @@ def optimize_scalar_weights(target, predict, predict_weight=None):
         res = minimize(_mse, [1, 1], args=(target, predict, predict_weight))
         return res.x
     except ValueError:
-        print 'scipy.optimize.minimize returned unexplained ValueError.  Returning default weights.'
+        print 'scipy.optimize.minimize returned unexplained ValueError.  \
+Returning default weights.'
         return [1, 1]
 
 
@@ -860,7 +895,6 @@ def _mse(weights, target, predict, predict_weight):
     OUT
         MSE
     '''
-    # pdb.set_trace()
     wy, wb = weights
     if predict_weight is not None:
         wb = wb * predict_weight
