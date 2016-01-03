@@ -36,6 +36,11 @@ class TestIncrementalModel(unittest.TestCase):
         self.assertEqual(baseline.loc['2015-1-2 21:30'],
                          baseline.loc['2015-1-9 21:30'])
 
+    def test_set_actual(self):
+        actual = select_mungedata_simple(2, 1, '2015-1-1', '2015-1-10')
+        self.im.set_actual(actual.waittime)
+        self.assertEqual(actual.ix[24].waittime, self.im.actual.ix[24])
+        
 
 class TestBorderImpute(unittest.TestCase):
     def test_create_neighbor_features(self):

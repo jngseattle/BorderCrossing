@@ -26,10 +26,12 @@ class IncrementalModel(object):
         model: initialized sklearn regressor
     '''
     def __init__(self, df, model, categoricals=None, sampling='30min',
-                 numdelta=12):
+                 numdelta=12, optimize_weights=False):
         self.model = model
         self.sampling = sampling
         self.numdelta = numdelta
+        self.actual = None
+        self.optimize_weights = optimize_weights
 
         # Prepare training data
         # Resample to remove gaps, inserting NA's
@@ -99,6 +101,13 @@ first day of test data.')
 
         return predict
 
+    def set_actual(self, series):
+        '''
+        IN
+            series: series with datetime index
+        '''
+        self.actual = series
+
     def baseline(self):
         '''
         Compute baseline prediction based on day of week for last year of
@@ -129,7 +138,7 @@ first day of test data.')
 
         return baseline.waittime.sort_index()
 
-    def ensemble(self, actual, baseline):
+    def ensemble(self, actual=None, baseline=None):
         '''
         Ensemble predictions with baseline optimized for test values
 
@@ -137,19 +146,29 @@ first day of test data.')
             actual: test data
             baseline: baseline data
         '''
+        if actual is None:
+            actual = self.actual
+        if baseline is None:
+            baseline = self.baseline()
+
         # Compute weights.  Since actual may have missing data, predictions
         # and baseline are filtered
         # Harmonic mean is used for ensembling
-        wy, wb = optimize_scalar_weights(actual,
-                                         (self.y_predict.loc[actual.index],
-                                          baseline.loc[actual.index]))
+        if self.optimize_weights:
+            wy, wb = optimize_scalar_weights(actual,
+                                             (self.y_predict.loc[actual.index],
+                                              baseline.loc[actual.index]))
+            print "Weights: ", wy, wb
+        else:
+            wy, wb = 1, 1
 
-        print "Weights: ", wy, wb
         return harmonic_mean((baseline.loc[actual.index],
                              self.y_predict.loc[actual.index]), (wy, wb))
 
-    def score(self, actual):
+    def score(self, actual=None):
         if hasattr(self, 'y_predict'):
+            if actual is None:
+                actual = self.actual
             actual = actual.resample(self.sampling, how='mean').dropna()
 
             model_r2 = r2_score(actual, self.y_predict.loc[actual.index])
@@ -829,7 +848,7 @@ def optimize_scalar_weights(target, predict, predict_weight=None):
         res = minimize(_mse, [1, 1], args=(target, predict, predict_weight))
         return res.x
     except ValueError:
-        print 'minimize unexplained ValueError.  Returning default weights'
+        print 'scipy.optimize.minimize returned unexplained ValueError.  Returning default weights.'
         return [1, 1]
 
 
