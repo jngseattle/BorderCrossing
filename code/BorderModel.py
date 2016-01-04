@@ -624,16 +624,19 @@ class BorderImpute(object):
         targetdf: dataframe of target data with neighbor effects
         predictdf: dataframe with latest predictions
     '''
-    def __init__(self, label='waittime', threshold=10,
+    def __init__(self, label='waittime', threshold=10, window=4,
                  neighborfunc=create_neighbor_features):
         self.label = label
         self.threshold = threshold
         self.neighborfunc = neighborfunc
+        self.window = window
         pass
 
     def prepare_source(self, df):
         '''
         Prepare source data for modeling
+        Values above threshold are removed to improve model for predicting
+        values below threshold
 
         IN
             df: dataframe with features and label
@@ -641,7 +644,7 @@ class BorderImpute(object):
             dataframe of prepared source data
         '''
         # Add neighbor features
-        df_neighbors = self.neighborfunc(create_leadlag(df),
+        df_neighbors = self.neighborfunc(create_leadlag(df, size=self.window),
                                          feature=self.label)
         self.sourcedf = df.join(df_neighbors)
 
@@ -655,7 +658,10 @@ class BorderImpute(object):
 
     def build_model(self, estimator):
         '''
-        Trains each neighbor model
+        Trains 3 models which use lead and lag values for estimates
+        * Lead + lag
+        * Lead only
+        * Lag only
 
         IN
             estimator: initialized sklearn model
@@ -706,7 +712,7 @@ class BorderImpute(object):
                                                 None if x == 0 else x)
 
         # Add neighbor features
-        df_neighbors = self.neighborfunc(create_leadlag(df1),
+        df_neighbors = self.neighborfunc(create_leadlag(df1, size=self.window),
                                          feature=self.label)
         self.targetdf = df1.join(df_neighbors)
 
@@ -773,7 +779,8 @@ class BorderImpute(object):
         self.predictdf.loc[X_test.index, self.label] = yhat
 
         # Recalculate lead/lag
-        df_neighbors = self.neighborfunc(create_leadlag(self.predictdf),
+        df_neighbors = self.neighborfunc(create_leadlag(self.predictdf,
+                                                        size=self.window),
                                          feature=self.label)
         self.predictdf = self.predictdf.drop(['lag', 'lead'], 1)\
             .join(df_neighbors)
