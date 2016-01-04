@@ -945,18 +945,23 @@ def model_years(df, model, start, end, categoricals=None):
     return trained
 
 
-def smooth(munger_id, crossing_id, field, limit=None, path='../data'):
+def smooth(munger_id, crossing_id, field, limit=None, path='../data', df=None):
     '''
     Smooth data and write output to CSV
 
     IN
         munger_id
         crossing_id
-        dataframe with date and data field ordered by date
+        field: name of target field
+        limit: string for limiting query; used for testing
+        path: path to data directory
+        df: dataframe to override default functionality of query raw data
+            dataframe must have datetime index and data ordered by date
     OUT
         None
     '''
-    query = '''
+    if df is None:
+        query = '''
             select
                 c.date,
                 {0}
@@ -969,11 +974,11 @@ def smooth(munger_id, crossing_id, field, limit=None, path='../data'):
             order by c.date {2};
             '''
 
-    if limit is not None:
-        limitstring = "limit %s" % (limit)
-    else:
-        limitstring = ""
-    df = pd_query(query.format(field, crossing_id, limitstring))
+        if limit is not None:
+            limitstring = "limit %s" % (limit)
+        else:
+            limitstring = ""
+            df = pd_query(query.format(field, crossing_id, limitstring))
 
     lowess = sm.nonparametric.lowess
     z = lowess(df[field], df.index, frac=12. / len(df), it=1)
