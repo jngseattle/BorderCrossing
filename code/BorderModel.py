@@ -625,12 +625,12 @@ class BorderImpute(object):
         predictdf: dataframe with latest predictions
     '''
     def __init__(self, label='waittime', threshold=10, window=4,
-                 neighborfunc=create_neighbor_features):
+                 neighborfunc=create_neighbor_features, progressbar=True):
         self.label = label
         self.threshold = threshold
         self.neighborfunc = neighborfunc
         self.window = window
-        pass
+        self.progressbar = progressbar
 
     def prepare_source(self, df):
         '''
@@ -670,18 +670,21 @@ class BorderImpute(object):
         '''
         X, y = xy_laglead(self.sourcedf, ['lead'], ['lag'], lag=True,
                           lead=True, label=self.label)
-        self.model_ll = copy.copy(estimator)
+        self.model_ll = copy.deepcopy(estimator)
         self.model_ll.fit(X, y)
+        self.columns_ll = X.columns.values
 
         X, y = xy_laglead(self.sourcedf, ['lead'], ['lag'], lead=True,
                           label=self.label)
-        self.model_lead = copy.copy(estimator)
+        self.model_lead = copy.deepcopy(estimator)
         self.model_lead.fit(X, y)
+        self.columns_lead = X.columns.values
 
         X, y = xy_laglead(self.sourcedf, ['lead'], ['lag'], lag=True,
                           label=self.label)
-        self.model_lag = copy.copy(estimator)
+        self.model_lag = copy.deepcopy(estimator)
         self.model_lag.fit(X, y)
+        self.columns_lag = X.columns.values
 
     def load_models(self, model_ll, model_lead, model_lag):
         '''
@@ -732,9 +735,10 @@ class BorderImpute(object):
 
         # Set up progressbar
         nullcount = pd.isnull(self.predictdf[self.label]).sum()
-        maxnullcount = nullcount
-        f = FloatProgress(min=0, max=maxnullcount)
-        display(f)
+        if self.progressbar:
+            maxnullcount = nullcount
+            f = FloatProgress(min=0, max=maxnullcount)
+            display(f)
 
         while nullcount > 0:
             if ((~pd.isnull(dftest.lead)) &
@@ -749,7 +753,8 @@ class BorderImpute(object):
 
             nullcount = pd.isnull(self.predictdf[self.label]).sum()
             print nullcount
-            f.value = maxnullcount - nullcount
+            if self.progressbar:
+                f.value = maxnullcount - nullcount
 
     def predict_once(self, df, lead=False, lag=False):
         # Omit null values
