@@ -1004,5 +1004,31 @@ def smooth(munger_id, crossing_id, field, limit=None, path='../data', df=None):
 
 def print_importances(model, columns):
     pp = pprint.PrettyPrinter(indent=4)
-    pp.pprint(sorted(zip(columns, model.feature_importances_), 
+    pp.pprint(sorted(zip(columns, model.feature_importances_),
                      key=lambda x: x[1])[::-1])
+
+
+def rolling_volume_aggregate(days, percent=.5):
+    '''
+    Returns a dataframe with date and multiple rolling_means of the average
+    aggregrate volume inbalance between north and south crossings
+
+    IN
+        days: list of days for rolling_means
+        percent: percentage of values that can be missing for rolling_mean to
+                 not return NA
+    OUT
+        dataframe of form: date, vol_mean_1, vol_mean_2, etc.
+                           for each day in days; nulls excluded from output
+    '''
+    series = pd_query('select date, volume from dailyvolume order by date')\
+        .set_index('date').volume
+    df = pd.DataFrame()
+
+    for day in days:
+        df['vol_mean_{0}'.format(day)] = \
+            pd.rolling_mean(series, day, min_periods=day * percent).shift(1)
+
+    df.index = pd.to_datetime(df.index)
+
+    return df.dropna()
