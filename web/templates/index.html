@@ -22,10 +22,9 @@
       <fieldset>
 
         <div class="form-group">
-            <label class="col-lg-2 control-label">Date</label>
-            <div class="col-lg-2">
+            <div class="col-xs-10">
                 <div class="input-group date">
-                  <input name="date" type="text" class="form-control"><span class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
+                  <input name="date" type="text" class="form-control" value="{{default_date}}"><span class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
                 </div>
                 {% for error in form.date.errors %}
                   <span style="color: red;">[{{ error }}]</span>
@@ -34,7 +33,7 @@
         </div>
 
         <div class="form-group">
-          <div class="col-lg-10">
+          <div class="col-xs-10">
               <div class="btn-group" data-toggle="buttons">
                 <label class="btn btn-primary active">
                   <input type="radio" name="location" value="Peace Arch" id="option1" autocomplete="off" checked> Peace Arch
@@ -47,7 +46,7 @@
         </div>
 
         <div class="form-group">
-          <div class="col-lg-10">
+          <div class="col-xs-10">
               <div class="btn-group" data-toggle="buttons">
                 <label class="btn btn-success active">
                   <input type="radio" name="direction" value="Northbound" id="option1" autocomplete="off" checked> Northbound
@@ -60,7 +59,7 @@
         </div>
 
         <div class="form-group">
-          <div class="col-lg-10 col-lg-offset-2">
+          <div class="col-xs-10">
             <button type="reset" class="btn btn-default">Cancel</button>
             <button id="submit" type="submit" class="btn btn-warning">Predict</button>
           </div>

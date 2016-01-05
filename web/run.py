@@ -21,7 +21,10 @@ def index():
                                             form.direction.data)
         return redirect(url)
 
+    date_formatted = datetime.datetime.now().strftime('%m/%d/%Y')
+
     return render_template('index.html',
+                           default_date=date_formatted,
                            form=form)
 
 
