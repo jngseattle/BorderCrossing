@@ -13,6 +13,7 @@ from ipywidgets import FloatProgress
 from IPython.display import display
 from BorderQuery import select_mungedata, select_predictions, \
     select_features, select_mungedata_simple
+import pprint
 
 
 class IncrementalModel(object):
@@ -999,3 +1000,9 @@ def smooth(munger_id, crossing_id, field, limit=None, path='../data', df=None):
                  index=False, header=False)
 
     return df
+
+
+def print_importances(model, columns):
+    pp = pprint.PrettyPrinter(indent=4)
+    pp.pprint(sorted(zip(columns, model.feature_importances_), 
+                     key=lambda x: x[1])[::-1])
