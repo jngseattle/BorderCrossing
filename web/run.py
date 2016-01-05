@@ -17,7 +17,8 @@ def index():
         # flash('Date="%s", location=%s' %
         #       (form.date.data, str(form.location.data)))
 
-        url = '/predict/{0}/{1}'.format(form.date.data, form.location.data)
+        url = '/predict/{0}/{1}/{2}'.format(form.date.data, form.location.data,
+                                            form.direction.data)
         return redirect(url)
 
     return render_template('index.html',

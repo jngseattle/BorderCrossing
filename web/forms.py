@@ -5,3 +5,4 @@ from wtforms.validators import DataRequired
 class BorderForm(Form):
     date = DateField('date', validators=[DataRequired()], format='%m/%d/%Y')
     location = StringField('location')
+    direction = StringField('direction')
