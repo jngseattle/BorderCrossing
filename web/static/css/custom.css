@@ -19,6 +19,11 @@
     fill: none;
 }
 
+.ct-series-c .ct-line {
+  opacity: .7;
+  stroke-width: 2px;
+}
+
 .ct-label {
     font-size: 1em;
 }

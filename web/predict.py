@@ -8,8 +8,7 @@ import pdb
 # Set globals
 # TODO: read from config file - LOW PRI
 CROSSINGS = get_crossings()
-MUNGER = 2
-PMODEL = 'v0.5'      # Prediction model
+PMODEL = 'v2.1'      # Prediction model
 BMODEL = 'b2014'     # Baseline model
 
 
@@ -40,35 +39,98 @@ def predict(location, direction, lane, start, end):
             from predictions p
             inner join predictions b
                 on p.date = b.date
-                and b.crossing_id = {3}
-                and b.munger_id = '{2}'
+                and b.crossing_id = {2}
                 and b.model_version = '{1}'
             where
-                p.date >= '{4}' and p.date < '{5}'
-                and p.crossing_id = {3}
-                and p.munger_id = '{2}'
+                p.date >= '{3}' and p.date < '{4}'
+                and p.crossing_id = {2}
                 and p.model_version = '{0}'
             order by p.date
             '''
 
-    df = pd_query(query.format(PMODEL, BMODEL, MUNGER, xid, start, end))
+    df = pd_query(query.format(PMODEL, BMODEL, xid, start, end))
     return df
 
 
-def daily_prediction(start, location, direction='Southbound', lane='Car'):
-    '''
-    IN
-        start: datetime
-        location: name of crossing
-        direction: name of direction
-        lane: name of lane
-    '''
+def get_prediction(start, location, direction, lane):
+    xid, start, end = get_chart_params(start, location, direction, lane)
+
+    query = '''
+            select
+                d.date,
+                waittime
+            from datefeatures d
+            left join predictions p
+                on d.date = p.date
+                and crossing_id = {1}
+                and model_version = '{0}'
+            where
+                d.date >= '{2}' and d.date < '{3}'
+                and (minute = 0 or minute=30)
+            order by date
+            '''
+
+    df = pd_query(query.format(PMODEL, xid, start, end))
+
+    return df
+
+
+def get_baseline(start, location, direction, lane):
+    xid, start, end = get_chart_params(start, location, direction, lane)
+
+    query = '''
+            select
+                d.date,
+                waittime
+            from datefeatures d
+            left join predictions p
+                on d.date = p.date
+                and crossing_id = {1}
+                and model_version = '{0}'
+            where
+                d.date >= '{2}' and d.date < '{3}'
+                and (minute = 0 or minute=30)
+            order by date
+            '''
+
+    df = pd_query(query.format(BMODEL, xid, start, end))
+    return df
+
+
+def get_actual(start, location, direction, lane):
+    xid, start, end = get_chart_params(start, location, direction, lane)
+
+    query = '''
+            select
+                d.date,
+                waittime
+            from datefeatures d
+            left join crossingdata c
+                on d.date = c.date
+                and crossing_id = {0}
+            where
+                d.date >= '{1}' and d.date < '{2}'
+                and (minute = 0 or minute=30)
+            order by date
+            '''
+
+    df = pd_query(query.format(xid, start, end))
+    return df
+
+
+def get_chart_params(start, location, direction, lane):
     end = start + datetime.timedelta(hours=24)
-    df = predict(location, direction, lane, start, end)
 
-    return df
+    xid = CROSSINGS[(CROSSINGS.location_name == location)
+                    & (CROSSINGS.direction_name == direction)
+                    & (CROSSINGS.lane_name == lane)].index[0]
+
+    if id is None:
+        raise RuntimeError('Crossing not matched for: ', location,
+                           direction, lane)
+
+    return xid, start, end
 
 
 if __name__ == '__main__':
-    delays = daily_prediction(datetime.datetime(2016, 1, 10), 'Pacific Highway')
-    print delays[:50]
+    pass

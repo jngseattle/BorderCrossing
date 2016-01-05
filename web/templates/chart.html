@@ -29,17 +29,17 @@
             </div>
             <div class="row">
                 <div class="btn-group btn-group-justified" role="group" aria-label="...">
-                    <a href="/predict/{{last_week}}/{{location|e}}" class="btn btn-default btn-sm" role="button">
+                    <a href="/predict/{{last_week}}/{{location|e}}/{{direction}}" class="btn btn-default btn-sm" role="button">
                         <span class="glyphicon glyphicon-chevron-left" aria-hidden="true"></span>
                         <span class="glyphicon glyphicon-chevron-left" aria-hidden="true"></span>
                     </a>
-                    <a href="/predict/{{yesterday}}/{{location|e}}" class="btn btn-default btn-sm" role="button">
+                    <a href="/predict/{{yesterday}}/{{location|e}}/{{direction}}" class="btn btn-default btn-sm" role="button">
                         <span class="glyphicon glyphicon-chevron-left" aria-hidden="true"></span>
                     </a>
-                    <a href="/predict/{{tomorrow}}/{{location|e}}" class="btn btn-default btn-sm" role="button">
+                    <a href="/predict/{{tomorrow}}/{{location|e}}/{{direction}}" class="btn btn-default btn-sm" role="button">
                         <span class="glyphicon glyphicon-chevron-right" aria-hidden="true"></span>
                     </a>
-                    <a href="/predict/{{next_week}}/{{location|e}}" class="btn btn-default btn-sm" role="button">
+                    <a href="/predict/{{next_week}}/{{location|e}}/{{direction}}" class="btn btn-default btn-sm" role="button">
                         <span class="glyphicon glyphicon-chevron-right" aria-hidden="true"></span>
                         <span class="glyphicon glyphicon-chevron-right" aria-hidden="true"></span>
                     </a>
@@ -52,15 +52,21 @@
                     {{location}} <span class="caret"></span>
                   </button>
                   <ul class="dropdown-menu">
-                    <li><a href="/predict/{{date}}/Peace%20Arch">Peace Arch</a></li>
-                    <li><a href="/predict/{{date}}/Pacific%20Highway">Pacific Highway</a></li>
+                    <li><a href="/predict/{{date}}/Peace%20Arch/{{direction}}">Peace Arch</a></li>
+                    <li><a href="/predict/{{date}}/Pacific%20Highway/{{direction}}">Pacific Highway</a></li>
                   </ul>
                 </div>
             </div>
             <div class="row top10"></div>
-            <div class="row"><button type="button" class="btn btn-success btn-block" disabled="disabled">{{direction}}</button></div>
-            <div class="row top10"></div>
-            <div class="row"><button type="button" class="btn btn-info btn-block" disabled="disabled">{{lane}}</button></div>
+            <div class="btn-group btn-block">
+              <button type="button" class="btn btn-success dropdown-toggle btn-block" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                {{direction}} <span class="caret"></span>
+              </button>
+              <ul class="dropdown-menu">
+                <li><a href="/predict/{{date}}/{{location}}/Northbound">Northbound</a></li>
+                <li><a href="/predict/{{date}}/{{location}}/Southbound">Southbound</a></li>
+              </ul>
+            </div>
         </div>
     </div>
 {% endblock %}
@@ -81,13 +87,15 @@ $('.input-group.date').datepicker()
 <script>
 var data = {
     labels : {{ labels|safe }},
-    series : [ {{ predict|safe }}, {{ baseline|safe }} ]
+    series : [ {{ predict|safe|replace('None', '-100') }},
+               {{ baseline|safe|replace('None', '-100') }},
+               {{ actual|safe|replace('None', '-100')|replace('nan', 'null') }} ]
 };
 
 var options = {
     showPoint: false,
     low: 0,
-    showArea: true,
+    // showArea: true,
     lineSmooth: Chartist.Interpolation.cardinal({
         tension: 1,
         fillHoles: true

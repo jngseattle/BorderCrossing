@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, g, flash, redirect
 from forms import BorderForm
-from predict import daily_prediction
+from predict import daily_prediction, get_prediction, get_actual, get_baseline
 from bokeh import embed
 from bokeh.plotting import figure, output_notebook, show
 from bokeh.models import HoverTool
@@ -29,9 +29,11 @@ def index():
 @app.route('/predict/<date>/<location>/<direction>')
 @app.route('/predict/<date>/<location>/<direction>/<lane>')
 def prediction_page(date, location, direction='Southbound', lane='Car'):
-    # Get predictions
+    # Get chart data
     start = datetime.datetime.strptime(date, '%Y-%m-%d')
-    results = daily_prediction(start, location, direction, lane)
+    predict = get_prediction(start, location, direction, lane)
+    baseline = get_baseline(start, location, direction, lane)
+    actual = get_actual(start, location, direction, lane)
 
     # Create labels by hour
     labels = []
@@ -65,8 +67,9 @@ def prediction_page(date, location, direction='Southbound', lane='Car'):
                            location=location,
                            direction=direction,
                            lane=lane,
-                           predict=list(results.predict),
-                           baseline=list(results.baseline),
+                           predict=list(predict.waittime),
+                           baseline=list(baseline.waittime),
+                           actual=list(actual.waittime),
                            labels=labels,
                            next_week=next_week,
                            last_week=last_week,
