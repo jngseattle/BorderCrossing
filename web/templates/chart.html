@@ -58,14 +58,16 @@
                 </div>
             </div>
             <div class="row top10"></div>
-            <div class="btn-group btn-block">
-              <button type="button" class="btn btn-success dropdown-toggle btn-block" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                {{direction}} <span class="caret"></span>
-              </button>
-              <ul class="dropdown-menu">
-                <li><a href="/predict/{{date}}/{{location}}/Northbound">Northbound</a></li>
-                <li><a href="/predict/{{date}}/{{location}}/Southbound">Southbound</a></li>
-              </ul>
+            <div class="row">
+                <div class="btn-group btn-block">
+                  <button type="button" class="btn btn-success dropdown-toggle btn-block" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    {{direction}} <span class="caret"></span>
+                  </button>
+                  <ul class="dropdown-menu">
+                    <li><a href="/predict/{{date}}/{{location}}/Northbound">Northbound</a></li>
+                    <li><a href="/predict/{{date}}/{{location}}/Southbound">Southbound</a></li>
+                  </ul>
+                </div>
             </div>
         </div>
     </div>
@@ -87,19 +89,40 @@ $('.input-group.date').datepicker()
 <script>
 var data = {
     labels : {{ labels|safe }},
-    series : [ {{ predict|safe|replace('None', '-100') }},
-               {{ baseline|safe|replace('None', '-100') }},
-               {{ actual|safe|replace('None', '-100')|replace('nan', 'null') }} ]
+    series : [ {name: 'predict', data: {{ predict|safe|replace('None', 'null')|replace('[null', '[0') }} },
+               {name: 'baseline', data: {{ baseline|safe|replace('None', 'null')|replace('[null', '[0') }} },
+               {name: 'actual', data: {{ actual|safe|replace('None', 'null')|replace('[null', '[0') |replace('nan', 'null') }} }
+           ]
 };
 
 var options = {
     showPoint: false,
     low: 0,
-    // showArea: true,
     lineSmooth: Chartist.Interpolation.cardinal({
         tension: 1,
         fillHoles: true
     }),
+    series: {
+        'predict': {
+            lineSmooth: Chartist.Interpolation.cardinal({
+                tension: 1,
+                fillHoles: true
+            }),
+            showArea: true
+        },
+        'baseline': {
+            lineSmooth: Chartist.Interpolation.cardinal({
+                tension: 1,
+                fillHoles: true
+            })
+        },
+        'actual': {
+            lineSmooth: Chartist.Interpolation.cardinal({
+                tension: 0,
+                fillHoles: true
+            })
+        }
+    },
     chartPadding: {
                     top: 0,
                     right: 0,

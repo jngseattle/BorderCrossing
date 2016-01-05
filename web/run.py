@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, g, flash, redirect
 from forms import BorderForm
-from predict import daily_prediction, get_prediction, get_actual, get_baseline
+from predict import get_prediction, get_actual, get_baseline
 from bokeh import embed
 from bokeh.plotting import figure, output_notebook, show
 from bokeh.models import HoverTool
