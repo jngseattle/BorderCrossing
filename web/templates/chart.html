@@ -89,8 +89,8 @@ $('.input-group.date').datepicker()
 <script>
 var data = {
     labels : {{ labels|safe }},
-    series : [ {name: 'predict', data: {{ predict|safe|replace('None', 'null')|replace('[null', '[0') }} },
-               {name: 'baseline', data: {{ baseline|safe|replace('None', 'null')|replace('[null', '[0') }} },
+    series : [ {name: 'predict', data: {{ predict|safe|replace('None', 'null')|replace('[null', '[0') |replace('nan', 'null')}} },
+               {name: 'baseline', data: {{ baseline|safe|replace('None', 'null')|replace('[null', '[0') |replace('nan', 'null')}} },
                {name: 'actual', data: {{ actual|safe|replace('None', 'null')|replace('[null', '[0') |replace('nan', 'null') }} }
            ]
 };
