@@ -17,6 +17,7 @@
 
 .ct-series-c .ct-line {
   opacity: .7;
+  stroke: #eed05c;
   stroke-width: 2px;
 }
 
@@ -30,3 +31,23 @@
 .top15 { margin-top:15px; }
 .top17 { margin-top:17px; }
 .top30 { margin-top:30px; }
+
+.input-color {
+    position: relative;
+}
+.input-color input {
+    padding-left: 30px;
+}
+.input-color .color-box {
+    width: 15px;
+    height: 15px;
+    display: inline-block;
+    /*background-color: #ccc;*/
+    position: absolute;
+    left: 5px;
+    top: 5px;
+    background-color: #FF850A;
+}
+.input-color .color-box .series-a {
+    background-color: #ff6600;
+}

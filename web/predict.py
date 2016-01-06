@@ -12,45 +12,6 @@ PMODEL = 'v2.1'      # Prediction model
 BMODEL_POST2016 = 'b2015'     # Baseline model
 BMODEL_PRE2016 = 'b.1year'     # Baseline model
 
-def predict(location, direction, lane, start, end):
-    '''
-    IN
-        location: name of crossing
-        direction: name of direction
-        lane: name of lane
-        start: datetime
-        end: datetime
-    OUT
-        dataframe with date, prediction and baseline
-    '''
-    xid = CROSSINGS[(CROSSINGS.location_name == location)
-                    & (CROSSINGS.direction_name == direction)
-                    & (CROSSINGS.lane_name == lane)].index[0]
-
-    if id is None:
-        raise RuntimeError('Crossing not matched for: ', location,
-                           direction, lane)
-
-    query = '''
-            select
-                p.date,
-                p.waittime as predict,
-                b.waittime as baseline
-            from predictions p
-            inner join predictions b
-                on p.date = b.date
-                and b.crossing_id = {2}
-                and b.model_version = '{1}'
-            where
-                p.date >= '{3}' and p.date < '{4}'
-                and p.crossing_id = {2}
-                and p.model_version = '{0}'
-            order by p.date
-            '''
-
-    df = pd_query(query.format(PMODEL, BMODEL, xid, start, end))
-    return df
-
 
 def get_prediction(start, location, direction, lane):
     xid, start, end = get_chart_params(start, location, direction, lane)
