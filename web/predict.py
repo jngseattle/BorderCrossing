@@ -9,8 +9,8 @@ import pdb
 # TODO: read from config file - LOW PRI
 CROSSINGS = get_crossings()
 PMODEL = 'v2.1'      # Prediction model
-BMODEL = 'b2014'     # Baseline model
-
+BMODEL_POST2016 = 'b2015'     # Baseline model
+BMODEL_PRE2016 = 'b.1year'     # Baseline model
 
 def predict(location, direction, lane, start, end):
     '''
@@ -93,7 +93,13 @@ def get_baseline(start, location, direction, lane):
             order by date
             '''
 
-    df = pd_query(query.format(BMODEL, xid, start, end))
+    # Before 2016, baseline is computed from a rolling average
+    # After 2016, baseline is same as last week of 2015
+    if start.year >= 2016:
+        df = pd_query(query.format(BMODEL_POST2016, xid, start, end))
+    else:
+        df = pd_query(query.format(BMODEL_PRE2016, xid, start, end))
+
     return df
 
 
