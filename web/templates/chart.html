@@ -82,7 +82,7 @@ $('.input-group.date').datepicker()
         var parts = e.date.toLocaleDateString("en-US").split("/");
 
         var link = "";
-        link = link.concat('/predict/', parts[2], '-', parts[0], '-', parts[1], '/', encodeURIComponent('{{location}}'));
+        link = link.concat('/predict/', parts[2], '-', parts[0], '-', parts[1], '/', encodeURIComponent('{{location}}'), '/', '{{direction}}');
         location.href = link;
     });
 </script>
