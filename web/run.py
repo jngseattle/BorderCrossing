@@ -1,9 +1,6 @@
 from flask import Flask, render_template, request, g, flash, redirect
 from forms import BorderForm
 from predict import get_prediction, get_actual, get_baseline
-from bokeh import embed
-from bokeh.plotting import figure, output_notebook, show
-from bokeh.models import HoverTool
 import datetime
 app = Flask(__name__)
 app.config.from_object('config')
