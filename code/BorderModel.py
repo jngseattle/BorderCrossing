@@ -1004,8 +1004,12 @@ def smooth(munger_id, crossing_id, field, limit=None, path='../data', df=None):
 
 def print_importances(model, columns):
     pp = pprint.PrettyPrinter(indent=4)
-    pp.pprint(sorted(zip(columns, model.feature_importances_),
-                     key=lambda x: x[1])[::-1])
+    pp.pprint(sort_importances)
+
+
+def sort_importances(model, columns):
+    return sorted(zip(columns, model.feature_importances_),
+                  key=lambda x: x[1])[::-1]
 
 
 def rolling_volume_aggregate(days, percent=.5):

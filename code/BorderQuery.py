@@ -64,21 +64,7 @@ def select_mungedata(munger_id, crossing_id, start_date, end_date):
                 s_lead3.event as event_lead3,
                 s_lag3.event as event_lag3,
                 s_lead4.event as event_lead4,
-                s_lag4.event as event_lag4,
-                1 as sea,
-                1 as sea_lag1,
-                1 as sea_lead1,
-                1 as sea_lag2,
-                1 as sea_lead2,
-                1 as sea_lag3,
-                1 as sea_lead3,
-                1 as van,
-                1 as van_lag1,
-                1 as van_lead1,
-                1 as van_lag2,
-                1 as van_lead2,
-                1 as van_lag3,
-                1 as van_lead3
+                s_lag4.event as event_lag4
             from mungedata m
             join datefeatures d on m.date = d.date
             left join publicholiday h on m.date::timestamp::date = h.date
@@ -110,46 +96,6 @@ def select_mungedata(munger_id, crossing_id, start_date, end_date):
                 s_lead4.date - interval '4 day'
             left join specialdates s_lag4 on m.date::timestamp::date =
                 s_lag4.date + interval '4 day'
-            left join schoolcalendar sea on m.date::timestamp::date =
-                sea.date_out and sea.district='seattle'
-            left join schoolcalendar sea_lag1 on m.date::timestamp::date =
-                sea_lag1.date_out + interval '1 day'
-                and sea_lag1.district='seattle'
-            left join schoolcalendar sea_lead1 on m.date::timestamp::date =
-                sea_lead1.date_out - interval '1 day'
-                and sea_lead1.district='seattle'
-            left join schoolcalendar sea_lag2 on m.date::timestamp::date =
-                sea_lag2.date_out + interval '2 day'
-                and sea_lag2.district='seattle'
-            left join schoolcalendar sea_lead2 on m.date::timestamp::date =
-                sea_lead2.date_out - interval '2 day'
-                and sea_lead2.district='seattle'
-            left join schoolcalendar sea_lag3 on m.date::timestamp::date =
-                sea_lag3.date_out + interval '3 day'
-                and sea_lag3.district='seattle'
-            left join schoolcalendar sea_lead3 on m.date::timestamp::date =
-                sea_lead3.date_out - interval '3 day'
-                and sea_lead3.district='seattle'
-            left join schoolcalendar van on m.date::timestamp::date =
-                van.date_out and van.district='vancouver'
-            left join schoolcalendar van_lag1 on m.date::timestamp::date =
-                van_lag1.date_out + interval '1 day'
-                and van_lag1.district='vancouver'
-            left join schoolcalendar van_lead1 on m.date::timestamp::date =
-                van_lead1.date_out - interval '1 day'
-                and van_lead1.district='vancouver'
-            left join schoolcalendar van_lag2 on m.date::timestamp::date =
-                van_lag2.date_out + interval '2 day'
-                and van_lag2.district='vancouver'
-            left join schoolcalendar van_lead2 on m.date::timestamp::date =
-                van_lead2.date_out - interval '2 day'
-                and van_lead2.district='vancouver'
-            left join schoolcalendar van_lag3 on m.date::timestamp::date =
-                van_lag3.date_out + interval '3 day'
-                and van_lag3.district='vancouver'
-            left join schoolcalendar van_lead3 on m.date::timestamp::date =
-                van_lead3.date_out - interval '3 day'
-                and van_lead3.district='vancouver'
         where
             crossing_id = {0}
             and munger_id = {1}
@@ -280,21 +226,7 @@ def select_features(start_date, end_date):
                 s_lead3.event as event_lead3,
                 s_lag3.event as event_lag3,
                 s_lead4.event as event_lead4,
-                s_lag4.event as event_lag4,
-                1 as sea,
-                1 as sea_lag1,
-                1 as sea_lead1,
-                1 as sea_lag2,
-                1 as sea_lead2,
-                1 as sea_lag3,
-                1 as sea_lead3,
-                1 as van,
-                1 as van_lag1,
-                1 as van_lead1,
-                1 as van_lag2,
-                1 as van_lead2,
-                1 as van_lag3,
-                1 as van_lead3
+                s_lag4.event as event_lag4
             from datefeatures d
             left join publicholiday h on d.date::timestamp::date = h.date
             left join weather w on d.date::timestamp::date = w.date
@@ -325,46 +257,6 @@ def select_features(start_date, end_date):
                 s_lead4.date - interval '4 day'
             left join specialdates s_lag4 on d.date::timestamp::date =
                 s_lag4.date + interval '4 day'
-            left join schoolcalendar sea on d.date::timestamp::date =
-                sea.date_out and sea.district='seattle'
-            left join schoolcalendar sea_lag1 on d.date::timestamp::date =
-                sea_lag1.date_out + interval '1 day'
-                and sea_lag1.district='seattle'
-            left join schoolcalendar sea_lead1 on d.date::timestamp::date =
-                sea_lead1.date_out - interval '1 day'
-                and sea_lead1.district='seattle'
-            left join schoolcalendar sea_lag2 on d.date::timestamp::date =
-                sea_lag2.date_out + interval '2 day'
-                and sea_lag2.district='seattle'
-            left join schoolcalendar sea_lead2 on d.date::timestamp::date =
-                sea_lead2.date_out - interval '2 day'
-                and sea_lead2.district='seattle'
-            left join schoolcalendar sea_lag3 on d.date::timestamp::date =
-                sea_lag3.date_out + interval '3 day'
-                and sea_lag3.district='seattle'
-            left join schoolcalendar sea_lead3 on d.date::timestamp::date =
-                sea_lead3.date_out - interval '3 day'
-                and sea_lead3.district='seattle'
-            left join schoolcalendar van on d.date::timestamp::date =
-                van.date_out and van.district='vancouver'
-            left join schoolcalendar van_lag1 on d.date::timestamp::date =
-                van_lag1.date_out + interval '1 day'
-                and van_lag1.district='vancouver'
-            left join schoolcalendar van_lead1 on d.date::timestamp::date =
-                van_lead1.date_out - interval '1 day'
-                and van_lead1.district='vancouver'
-            left join schoolcalendar van_lag2 on d.date::timestamp::date =
-                van_lag2.date_out + interval '2 day'
-                and van_lag2.district='vancouver'
-            left join schoolcalendar van_lead2 on d.date::timestamp::date =
-                van_lead2.date_out - interval '2 day'
-                and van_lead2.district='vancouver'
-            left join schoolcalendar van_lag3 on d.date::timestamp::date =
-                van_lag3.date_out + interval '3 day'
-                and van_lag3.district='vancouver'
-            left join schoolcalendar van_lead3 on d.date::timestamp::date =
-                van_lead3.date_out - interval '3 day'
-                and van_lead3.district='vancouver'
         where
             d.date >= '{0}' and d.date < '{1}'
             and (minute = 0 or minute = 30)
