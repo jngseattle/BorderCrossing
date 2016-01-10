@@ -771,13 +771,13 @@ class BorderImpute(object):
         if not lead:
             X_test = X_test.drop('lead', 1)
 
-        # Predict, with decay scaling for lead or lag only
+        # Predict
         if lead and lag:
             yhat = self.model_ll.predict(X_test)
         elif lead:
-            yhat = self.model_lead.predict(X_test) / 2.
+            yhat = self.model_lead.predict(X_test)
         elif lag:
-            yhat = self.model_lag.predict(X_test) / 2.
+            yhat = self.model_lag.predict(X_test)
         else:
             raise RuntimeError('lead or lag must be True')
 
