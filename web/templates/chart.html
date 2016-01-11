@@ -98,11 +98,13 @@
 <script>
 $('.input-group.date').datepicker()
     .on('changeDate', function(e) {
-        var parts = e.date.toLocaleDateString("en-US").split("/");
+        year = e.date.getFullYear()
+        month = e.date.getMonth() + 1
+        day = e.date.getDate()
 
-        var link = "";
-        link = link.concat('/predict/', parts[2], '-', parts[0], '-', parts[1], '/', encodeURIComponent('{{location}}'), '/', '{{direction}}');
-        location.href = link;
+        var link = ""
+        link = link.concat('/predict/', year, '-', month, '-', day, '/', encodeURIComponent('{{location}}'), '/', '{{direction}}');
+        window.location.href = link;
     });
 </script>
 <script>
