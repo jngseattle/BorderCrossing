@@ -49,8 +49,12 @@ Alternatively, users can view an average of wait times for a day of week from th
 ### Provide predictions for northbound crossings
 The UC data only provides predictions for southbound crossings.  The reason for the omission is due to gaps in the data due to where the sensors are placed.  According to the data steward, data below a certain threshold are reported as zero.  
 
-The chart below shows volume in red and wait time in blue.  Notice that 12pm and 4pm, even though volume is at a peak, the wait time displays zero.  
+The chart below shows volume in red and wait time in blue.  Notice that between 12pm and 4pm, even though volume is at a peak, the wait time displays zero.
 ![](readme_images/northbound.png)
+
+Compare this to southbound data which shows more reasonable wait times throughout the day.  Even when the wait time drops, rarely does it drop to zero.
+![](readme_images/southbound.png)
+
 
 ## Pre-processing
 ### Imputing false zeros
@@ -141,8 +145,15 @@ There are a few factors that make ARIMA not applicable:
 An attempt at using ARIMA yielded predictions that repeated the same seasonal pattern indefinitely.
 
 ## Website
+![](readme_images/website.png)
 
+The website was built as a responsive site using Flask and Bootstrap.  For charting, the Chartist javascript library was used.  Data was persisted in a postgreSQL database.  
 
+Users can select a date, crossing location and direction to view intraday wait times.  For dates before 2016 predictions were generated on a weekly basis to emulate a production system where the model is retrained as new data is collected.
+
+For dates from 2016 onwards, predictions were generated at one time to emulate long-term predictions.
+
+The website is hosted on AWS at [http://borderforecaster.com](http://borderforecaster.com).
 
 ## Results
 
