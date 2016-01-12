@@ -62,7 +62,7 @@ For northbound data, the false zeros from chart above needed to be imputed befor
 
 Because of the large spans of false zeros, the imputer was applied iteratively, filling in missing values in step-wise fashion.
 
-The imputer was trained on southbound data with data below a configurable threshold set to zero.  Then all values below zero were 
+The imputer was trained on southbound data with data below a configurable threshold set to zero.  To validate the approach, the model was cross-validated on a separate southbound crossing where false zeros were emulated by removing data below some threshold.
 
 ### Smoothing and resampling
 Due to the noise in the raw data, data was smoothed with a window size of 1 hour using LOWESS. 
@@ -110,12 +110,12 @@ To capture this trend, a difference in daily average wait time was added as a fe
 
 ## Modeling
 ### Baseline
-A baseline model was defined as the average over the last 12 months by day of week.  The baseline is motivated by the day of week averages referenced above from UC, and by Random Forest models which tended to predict the same values as the baseline model.
+A baseline model was defined as the average over the last 12 months by day of week.  The baseline is motivated by the day of week predictions referenced above from the University of California, and by Random Forest models that I performed which tended to predict the same values as the baseline model.
 
 Predictions from the baseline model served as measuring stick for comparing the quality of my model.
 
 ### Extra Trees
-Random Forest was the first model attempted, but was never able to beat the baseline model.  Extra Trees was used instead which yielded better results and more variance in prediction compared to the baseline.  
+Random Forest was the first model attempted, but was never able to beat the baseline model.  A different decision tree model from scikitlearn, Extra Trees, was used instead yielding better results and more variance in prediction compared to the baseline.  
 
 Once trend features were added to the model, Extra Trees consistently beat the baseline predictions for different crossings, directions and years.
 
@@ -124,10 +124,10 @@ A Gradient Boosting model was tested, but the predictive accuracy was only margi
 ### Ensembling
 To further improve the predictive accuracy, the Extra Trees predictions were ensembled with the baseline predictions. Ensembling was performed using a harmonic mean with equal weights.  
 
-Different weights were attempted, but since optimal weights varied depending on the data set (year, crossing and direction), equal weights were used to generalize the model.
+Different weights were attempted, but since optimal weights varied depending on the data set (year, crossing and direction), equal weights were used to better generalize the model.
 
 ### Preventing Overfitting
-For any given data set, it was possible to improve the model via hyperparameter tuning.  However, this came at the expense of poorer predictive accuracy for a different data set, i.e. different year.
+For any given data set, it was possible to improve the model via hyperparameter tuning.  However, this came at the expense of poorer predictive accuracy for a different data set, e.g. different year.
 
 To keep the model generalizable, the Extra Trees model was loosely tuned with 96 estimators as the only non-default parameter.
 
