@@ -67,12 +67,12 @@ For northbound data, the false zeros from chart above needed to be imputed befor
 
 Because of the large spans of false zeros, the imputer was applied iteratively, filling in missing values in step-wise fashion.
 
-The imputer was trained on southbound data with data below a configurable threshold set to zero.  To validate the approach, the model was cross-validated on a separate southbound crossing where false zeros were emulated by removing data below some threshold.
+The imputer was trained on southbound data with data below a configurable threshold set to zero.  To validate the approach, the model was cross-validated on a separate southbound crossing where false zeros were emulated by removing data below a threshold.
 
 ### Smoothing and resampling
 Due to the noise in the raw data, data was smoothed with a window size of 1 hour using LOWESS. 
 
-Once smoothed, the data was resampled at 30 minute grain to reduce processing time without reducing the benefit to the end-user.
+Once smoothed, the data was resampled at 30 minute grain to reduce processing time without degrading the end-user experience.
 
 ## Feature Engineering
 ### Date and time features
@@ -99,14 +99,14 @@ Weather data was pulled from [Weather Underground](http://www.wunderground.com/)
 Lead and lag weather features were added to account for changes in traveler behavior after a weather event, or in anticipation of a weather event.
 
 ### Trend
-Wait time has decreased consistently over time as shown in chart below.
+Wait time has decreased over time as shown in chart below.
 ![](readme_images/trend.png)
 
-To capture this trend, a difference in daily average wait time was added as a feature.  Multiple differences were added over multiple weeks to capture both long term and short term trends.
+To model trend, a difference in daily average wait time was added as a feature.  Multiple difference features were included over multiple weeks to capture both long term and short term trends.  Note that each difference feature is quantized in 1 week intervals due to account for weekly seasonality.
 
 ### Excluded features
 
-| Feature | Result | 
+| Feature | Why excluded | 
 |---|---|
 | School calendars | no improvement |
 | Lag daily averages of wait times | overfit |
@@ -115,7 +115,7 @@ To capture this trend, a difference in daily average wait time was added as a fe
 
 ## Modeling
 ### Baseline
-A baseline model was defined as the average over the last 12 months by day of week.  The baseline is motivated by the day of week predictions referenced above from the University of California, and by Random Forest models that I performed which tended to predict the same values as the baseline model.
+A baseline model was defined as the average over the last 12 months by day of week.  The baseline is motivated by the day of week predictions referenced above from the University of California, and by predictions using Random Forest which tended to predict the same values as the baseline model.
 
 Predictions from the baseline model served as measuring stick for comparing the quality of my model.
 
@@ -143,7 +143,7 @@ There are a few factors that make ARIMA not applicable:
 2. Non-linear exogenous factors
 3. Slow to train for large number of exogenous factors
 
-An attempt at using ARIMA yielded predictions that repeated the same seasonal pattern indefinitely.
+An attempt at using ARIMA yielded predictions that repeated the same seasonal pattern without variation.
 
 ## Website
 ![](readme_images/website-home.png)
@@ -154,19 +154,19 @@ Users can select a date, crossing location and direction to view intraday wait t
 
 ![](readme_images/website-chart.png)
 
-``For dates from 2016 onwards, predictions were generated at one time to emulate long-term predictions.
+For dates from 2016 onwards, predictions were generated at one time to emulate long-term predictions.
 
 The website is hosted on AWS at [http://borderforecaster.com](http://borderforecaster.com).
 
 ## Results
 ### R-squared
-Below is a chart of R-squared calculated for predictions on Peace Arch southbound data.  The chart shows R-squared for both baseline and model when trained on a weekly or yearly basis.  Specifically, when trained yearly, predictions for an entire year are generated at one time.  When trained weekly, predictions for the year are generated a week at a time with the model retrained for each week of predictions.
+Below is a chart of R-squared calculated for predictions on Peace Arch southbound data.  The chart shows R-squared for both baseline and model when trained on a weekly or yearly basis.  When trained yearly, predictions for an entire year are generated all at once.  When trained weekly, predictions for the year are generated a week at a time with the model retrained for each week of predictions.
 
 ![](readme_images/r-squared.png)
 
-As should be expected, predictions trained weekly are better than predictions trained yearly.  In either cases, the model makes a better prediction than the baseline for each year.  The strength of the model is evidenced by the fact that ***the model when trained yearly beats the baseline when trained weekly*** for all years except 2015.
+As should be expected, predictions trained weekly are better than predictions trained yearly.  In both cases, the model makes a better prediction than the baseline for each year.  The strength of the model is evidenced by the fact that ***the model when trained yearly beats the baseline when trained weekly*** for all years except 2015.
 
-2015 shows the most dramatic improvements in R-squared due to the ability of the model to handle trend compared to the baseline.
+2015 shows the most dramatic improvements in R-squared due to the ability of the model to handle changes in trend.
 
 ### Feature importance
 
