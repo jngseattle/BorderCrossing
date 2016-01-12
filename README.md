@@ -1,17 +1,18 @@
 #Forecasting Wait Times at the US/Canada Border
 
-## Summary
+## Background
 Travel delays are a frustrating reality of driving and are particularly pronounced when crossing the US/Canada border.  Reliable and accurate predictions of wait times are not available to travelers.  This project predicts the wait times at the Peace Arch and Pacific Highway border crossings and provide users with a more reliable forecast of wait times for dates in 2016.
 
 ## Executive Summary
-### [Borderforecaster.com](http://borderforecaster.com)
-* Web app predicts wait times for Peace Arch and Pacific Highway crossings
-* Estimates data for northbound data which is missing data due to sensor issues
+### Deliverables
+* Model predictions of wait times for Peace Arch and Pacific Highway crossings
+* Estimates for missing northbound data due to known sensor issues
+* [Borderforecaster.com](http://borderforecaster.com) web app for displaying wait time predictions 
 
 ### Results
-* Model predictions better than day of week averages for last 12 months
-* Top features: time of day and weather 
-* Holidays that drive wait times are different between travel directions
+* Model predictions have better predictive accuracy than baseline model of 12 month averages by day of week
+* The most important features are time of day and weather
+* The holidays that drive wait times differ based on travel direction, with most important holidays being Victoria Day and Good Friday
 
 ## Data Source
 ### JSON API
@@ -38,7 +39,7 @@ Travel delays are a frustrating reality of driving and are particularly pronounc
 *This project focused on car lane data at Peace Arch and Pacific Highway crossings only.*
 
 ## Goals
-### Improve predictions compared to publically available tools
+### Improve predictions compared to publicly available tools
 Users can view real-time wait times from [WSDOT](http://www.wsdot.com/traffic/border/) or [US Customs](https://bwt.cbp.gov/), but the data is of limited value to those travelers already near the border.
 
 ![](readme_images/wsdot.png)
@@ -145,15 +146,42 @@ There are a few factors that make ARIMA not applicable:
 An attempt at using ARIMA yielded predictions that repeated the same seasonal pattern indefinitely.
 
 ## Website
-![](readme_images/website.png)
+![](readme_images/website-home.png)
 
-The website was built as a responsive site using Flask and Bootstrap.  For charting, the Chartist javascript library was used.  Data was persisted in a postgreSQL database.  
+The website is a responsive site using Flask and Bootstrap.  For charting, the [Chartist](https://gionkunz.github.io/chartist-js/) javascript library was used.  Data is persisted in a postgreSQL database.  
 
-Users can select a date, crossing location and direction to view intraday wait times.  For dates before 2016 predictions were generated on a weekly basis to emulate a production system where the model is retrained as new data is collected.
+Users can select a date, crossing location and direction to view intraday wait times.  For dates before 2016, predictions were generated on a weekly basis to emulate a production system where the model is retrained as new data is collected.
 
-For dates from 2016 onwards, predictions were generated at one time to emulate long-term predictions.
+![](readme_images/website-chart.png)
+
+``For dates from 2016 onwards, predictions were generated at one time to emulate long-term predictions.
 
 The website is hosted on AWS at [http://borderforecaster.com](http://borderforecaster.com).
 
 ## Results
+### R-squared
+Below is a chart of R-squared calculated for predictions on Peace Arch southbound data.  The chart shows R-squared for both baseline and model when trained on a weekly or yearly basis.  Specifically, when trained yearly, predictions for an entire year are generated at one time.  When trained weekly, predictions for the year are generated a week at a time with the model retrained for each week of predictions.
 
+![](readme_images/r-squared.png)
+
+As should be expected, predictions trained weekly are better than predictions trained yearly.  In either cases, the model makes a better prediction than the baseline for each year.  The strength of the model is evidenced by the fact that ***the model when trained yearly beats the baseline when trained weekly*** for all years except 2015.
+
+2015 shows the most dramatic improvements in R-squared due to the ability of the model to handle trend compared to the baseline.
+
+### Feature importance
+
+#### Overview
+![](readme_images/feature_importance.png)
+Time of day is the most important feature, corresponding to daily seasonality.
+
+Weather is the second most important class of features, driven by temperature and precipitation features.  These likely act as a proxy for yearly seasonality corresponding to seasons of the year.  When weather features are scaled according to their frequency of occurrence, snow and thunderstorms stand out as the most important weather features.
+
+#### Holidays
+![](readme_images/holidays.png)
+Differences between northbound and southbound crossings is most pronounced when comparing holiday features.  
+
+Interestingly, the two holidays with highest importance are Canadian holidays - Victoria Day for northbound traffic and Good Friday for southbound traffic.  Note that although Good Friday is recognized as a holiday in the US, it is broadly observed in Canada.
+
+There is evidence of bidirectional holiday traffic.  For example, southbound travel on the Sunday before Civic Day and northbound travel on Civic Day.  Similarly, northbound travel 2 days before Christmas with southbound travel 2 days after Christmas.
+
+The only day which displays high importance in both directions is the Saturday before Labor Day.
