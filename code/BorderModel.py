@@ -151,10 +151,10 @@ first day of test data.')
 
         IN
             actual: test data
+                    used for filtering predictions to match actual dataframe
+                    so scoring can be properly computed
             baseline: baseline data
         '''
-        if actual is None:
-            actual = self.actual
         if baseline is None:
             baseline = self.baseline()
 
@@ -169,8 +169,11 @@ first day of test data.')
         else:
             wy, wb = 1, 1
 
-        return harmonic_mean((baseline.loc[actual.index],
-                             self.y_predict.loc[actual.index]), (wy, wb))
+        if actual is not None:
+            return harmonic_mean((baseline.loc[actual.index],
+                                  self.y_predict.loc[actual.index]), (wy, wb))
+        else:
+            return harmonic_mean((baseline, self.y_predict), (wy, wb))
 
     def score(self, actual=None):
         if hasattr(self, 'y_predict'):
