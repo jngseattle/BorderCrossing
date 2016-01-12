@@ -79,11 +79,9 @@ def prediction_page(date, location, direction='Southbound', lane='Car'):
                            )
 
 
-@app.route('/chart')
-def chart():
-    labels = ["January","February","March","April","May","June","July","August"]
-    values = [10,9,8,7,6,4,7,8]
-    return render_template('chart.html', values=values, labels=labels)
+@app.route('/about')
+def about():
+    return render_template('about.html')
 
 
 if __name__ == '__main__':

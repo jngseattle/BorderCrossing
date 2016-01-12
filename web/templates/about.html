@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="container">
+    <div class="row">
+        <div class="col-lg-12">
+            <h1 class="page-header">About the App <small>Border Delay Forecaster</small></h1>
+            <p>This application was built as a capstone project for the Galvanize Data Science Bootcamp in Seattle.
+              Using historical data since 2007 from US and Canadian border agencies, I used a decision tree machine learning model to predict
+              wait times from 2014 through 2016.
+            </p>
+            <p>The model predictions are labeled as <b>predictions</b> in the charts.  Predictions from a naive model
+              taking a 12-month average by day of week is labeled as <b>baseline</b>.
+            </p>
+            <p>Details of the implementation can be found in my <a href="https://github.com/jngseattle/BorderCrossing">GitHub repo</a>.</p>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-lg-12">
+            <h1 class="page-header">About Me <small>Jeff Ng</small></h1>
+            <p>I am data scientist with a background in physics and over 15 years in the software industry.  As a developer, engineering manager or technical program manager,
+              I have been working with data for my entire career.  Over the last few years, I have focused on building business intelligence solutions.
+            </p>
+            <p>I discovered data science via Andrew Ng's excellent machine learning course on <a href="https://www.linkedin.com/in/jeffng">Coursera</a>.
+              It was an epiphany to find a field that combines my passion for finding insights with data, building software, solving business problems and applying the scientific method.
+            </p>
+            <p><a href="https://www.linkedin.com/in/jeffng">LinkedIn profile</a></p>
+            <p><a href="mailto:info@borderforecaster.com">Contact me</a></p>
+        </div>
+    </div>
+  </div>
+{% endblock %}
