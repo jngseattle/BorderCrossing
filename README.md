@@ -11,7 +11,7 @@ Travel delays are a frustrating reality of driving and are particularly pronounc
 
 ### Results
 * Model predictions have better predictive accuracy than baseline model of 12 month averages by day of week
-* The most important features are time of day and weather
+* The most important features are time of day and weather which capture daily and yearly seasonality, respectively
 * The holidays that drive wait times differ based on travel direction, with most important holidays being Victoria Day and Good Friday
 
 ## Data Source
