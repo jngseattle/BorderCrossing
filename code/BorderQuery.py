@@ -4,7 +4,7 @@ from dbhelper import pd_query, PgDB
 def select_mungedata(munger_id, crossing_id, start_date, end_date):
     query = '''
             select
-                m.date,
+                d.date,
                 metric as waittime,
                 year,
                 month,
@@ -65,8 +65,11 @@ def select_mungedata(munger_id, crossing_id, start_date, end_date):
                 s_lag3.event as event_lag3,
                 s_lead4.event as event_lead4,
                 s_lag4.event as event_lag4
-            from mungedata m
-            join datefeatures d on m.date = d.date
+            from datefeatures d
+            left join mungedata m on m.date = d.date
+                and crossing_id = {0}
+                and munger_id = {1}
+                and is_waittime = true
             left join publicholiday h on m.date::timestamp::date = h.date
             left join weather w on m.date::timestamp::date = w.date
             left join weather wp1 on m.date::timestamp::date =
@@ -97,13 +100,10 @@ def select_mungedata(munger_id, crossing_id, start_date, end_date):
             left join specialdates s_lag4 on m.date::timestamp::date =
                 s_lag4.date + interval '4 day'
         where
-            crossing_id = {0}
-            and munger_id = {1}
-            and (minute = 0 or minute = 30)
-            and is_waittime = true
-            and m.date >= '{2}'
-            and m.date < '{3}'
-        order by m.date;
+            (minute = 0 or minute = 30)
+            and d.date >= '{2}'
+            and d.date < '{3}'
+        order by d.date;
         '''
 
     return pd_query(query.format(crossing_id,

@@ -51,6 +51,8 @@ class IncrementalModel(object):
         # Remove nulls introduced by resampling and averager
         self.df = self.df.resample(self.sampling)
         self.df = self.df.join(self.deltas(self.df.waittime))
+        # Need to hold onto last day of y_test for predict
+        self.y_test = self.df[self.df.index.date == max(self.df.index.date)].waittime
         self.df = self.df.dropna()
 
         # Prepare X, y training data
@@ -68,12 +70,6 @@ class IncrementalModel(object):
             self.X_test = self.X_test.set_index('date')
         self.X_test = self.X_test.resample(self.sampling)
 
-        # Verify that training data and test data are contiguous
-        if self.X.index[-1].date() != \
-                self.X_test.index[0].date() - dt.timedelta(days=1):
-            raise ValueError('Last day of training data must be day before \
-first day of test data.')
-
         # Handle categoricals
         # Align columns to X, excluding delta columns
         if self.categoricals is not None:
@@ -85,13 +81,12 @@ first day of test data.')
         # Initialize for predictions
         predict = pd.Series()
         date = self.X_test.index[0].date()
-        y_test = self.y.resample(self.sampling)
+        y_test = self.y_test.resample(self.sampling)
 
         while sum(self.X_test.index.date == date) > 0:
             # Add delta averages to training data
             # TODO: more performant approach that doesn't require recomputing
             #       averages for previous training data
-            test = self.deltas(y_test.append(predict))
             Xt_1 = self.X_test.join(self.deltas(y_test.append(predict)))
             Xt_1 = Xt_1[Xt_1.index.date == date]
             Xt_1 = Xt_1.dropna()
@@ -216,12 +211,17 @@ first day of test data.')
                 df['avg_delta_{0}'.format(weeks)].fillna(method='pad')
 
         # Upsample to match original data
-        # Resample ends at last index value, so intraday values are not filled
+        # Resample function ends at last index value, so intraday values are not filled
         # To reconcile, an additional day is added to dataframe
         ix = pd.DatetimeIndex(start=df.index[0].date(),
                               end=df.index[-1].date() + dt.timedelta(1),
                               freq='D')
         df = df.reindex(ix).resample(self.sampling, fill_method='pad')
+
+        # There are pathological cases where training data is missing
+        # Backfill first, then zero fill
+        df = df.fillna(method='bfill')
+        df = df.fillna(0)
 
         # Shift forward to next day since deltas are used as lag features
         df.index = df.index + dt.timedelta(1)
