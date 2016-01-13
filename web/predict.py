@@ -8,9 +8,10 @@ import pdb
 # Set globals
 # TODO: read from config file - LOW PRI
 CROSSINGS = get_crossings()
-PMODEL = 'v2.1'      # Prediction model
+PMODEL_POST2016 = 'v2.1'      # Prediction model
+PMODEL_PRE2016 = 'v2.3'      # Prediction model
 BMODEL_POST2016 = 'b2015'     # Baseline model
-BMODEL_PRE2016 = 'b.1year'     # Baseline model
+BMODEL_PRE2016 = 'b.1y.1'     # Baseline model
 
 
 def get_prediction(start, location, direction, lane):
@@ -31,7 +32,10 @@ def get_prediction(start, location, direction, lane):
             order by date
             '''
 
-    df = pd_query(query.format(PMODEL, xid, start, end))
+    if start.year >= 2016:
+        df = pd_query(query.format(PMODEL_POST2016, xid, start, end))
+    else:
+        df = pd_query(query.format(PMODEL_PRE2016, xid, start, end))
 
     return df
 

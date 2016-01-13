@@ -22,7 +22,7 @@ class TestData(unittest.TestCase):
                 start = begin
                 while start <= end:
                     df = get_prediction(start, location, direction, lane)
-                    if  pd.isnull(df.waittime).sum() > minimum_points:
+                    if pd.isnull(df.waittime).sum() > minimum_points:
                         print '{0},{1},{2}'.format(start, location, direction)
 
                         errorcount += 1
@@ -47,7 +47,7 @@ class TestData(unittest.TestCase):
                 start = begin
                 while start <= end:
                     df = get_baseline(start, location, direction, lane)
-                    if  pd.isnull(df.waittime).sum() > minimum_points:
+                    if pd.isnull(df.waittime).sum() > minimum_points:
                         print '{0},{1},{2}'.format(start, location, direction)
 
                         errorcount += 1
