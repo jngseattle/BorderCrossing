@@ -102,7 +102,7 @@ Lead and lag weather features were added to account for changes in traveler beha
 Wait time has decreased over time as shown in chart below.
 ![](readme_images/trend.png)
 
-To model trend, a difference in daily average wait time was added as a feature.  Multiple difference features were included over multiple weeks to capture both long term and short term trends.  Note that each difference feature is quantized in 1 week intervals due to account for weekly seasonality.
+To model trend, a difference in daily average wait time was added as a feature.  Multiple difference features were included over multiple weeks to capture both long term and short term trends.  Note that each difference feature is quantized in 1 week intervals to account for weekly seasonality.
 
 ### Excluded features
 
